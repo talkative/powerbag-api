@@ -1,6 +1,6 @@
 # Powerbag API
 
-A RESTful API built with Node.js, Express, TypeScript, and MongoDB for the Powerbag application.
+A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing storylines, events, info content, and users in the Powerbag application.
 
 ## Features
 
@@ -28,13 +28,22 @@ src/
 ├── config/
 │   └── database.ts       # MongoDB connection configuration
 ├── dtos/
-│   └── *.dto.ts          # Data transfer objects
+│   └── CreateUser.dto.ts # Data transfer objects
 ├── handlers/
-│   └── *.ts              # Request handlers/controllers
+│   ├── events.ts         # Event handlers/controllers
+│   ├── info.ts           # Info content handlers
+│   ├── storyline.ts      # Storyline handlers
+│   └── users.ts          # User handlers
 ├── models/
-│   └── *.ts              # Mongoose models and schemas
+│   ├── Events.ts         # Event data model and schema
+│   ├── Info.ts           # Info content model
+│   ├── StoryLine.ts      # Storyline model with bags and stories
+│   └── User.ts           # User model and authentication
 ├── routes/
-│   └── *.ts              # API route definitions
+│   ├── events.ts         # Event API endpoints
+│   ├── info.ts           # Info content endpoints
+│   ├── storyline.ts      # Storyline API endpoints
+│   └── users.ts          # User API endpoints
 └── types/
     ├── query-params.ts   # Query parameter interfaces
     └── response.ts       # Response type definitions
@@ -94,19 +103,137 @@ npm run build
 npm start
 ```
 
-## API Structure
+## API Endpoints
 
-The API follows RESTful conventions with the following patterns:
+### Storylines (`/api/storylines`)
 
-- **Routes**: Define API endpoints and HTTP methods
-- **Handlers**: Process requests and business logic
-- **Models**: Define data schemas and database interactions
-- **DTOs**: Type-safe data transfer objects for request/response
-- **Types**: Shared type definitions and interfaces
+Complete storyline management with preview/published workflow:
+
+| Method   | Endpoint                     | Description                                |
+| -------- | ---------------------------- | ------------------------------------------ |
+| `GET`    | `/storylines`                | Get all storylines with optional filtering |
+| `GET`    | `/storylines/:title`         | Get specific storyline by title            |
+| `POST`   | `/storylines`                | Create or update a single storyline        |
+| `PUT`    | `/storylines`                | Batch create or update storylines          |
+| `DELETE` | `/storylines/:id`            | Delete specific storyline by ID            |
+| `DELETE` | `/storylines`                | Delete all storylines                      |
+| `GET`    | `/storylines/system/updates` | Check if updates are available             |
+| `POST`   | `/storylines/:title/publish` | Publish specific storyline                 |
+| `POST`   | `/storylines/publish/all`    | Publish all storylines                     |
+
+**Query Parameters:**
+
+- `status` - Filter by status (`preview` or `published`)
+- `titles` - Filter by specific titles (array or single value)
+
+### Events (`/api/events`)
+
+Event tracking and management:
+
+| Method   | Endpoint      | Description                              |
+| -------- | ------------- | ---------------------------------------- |
+| `GET`    | `/events`     | Get all events (sorted by creation date) |
+| `POST`   | `/events`     | Create new events collection             |
+| `DELETE` | `/events/:id` | Delete specific event by ID              |
+
+### Info Content (`/api/info`)
+
+Multi-language information content management:
+
+| Method | Endpoint    | Description                  |
+| ------ | ----------- | ---------------------------- |
+| `GET`  | `/info`     | Get info content             |
+| `POST` | `/info`     | Create new info content      |
+| `PUT`  | `/info/:id` | Update existing info content |
+
+### Users (`/api/users`)
+
+User account management:
+
+| Method | Endpoint     | Description     |
+| ------ | ------------ | --------------- |
+| `GET`  | `/users`     | Get all users   |
+| `GET`  | `/users/:id` | Get user by ID  |
+| `POST` | `/users`     | Create new user |
+
+## Data Models
+
+### StoryLine
+
+- `title` (string, required): Storyline title
+- `status` (enum): `'preview'` or `'published'`
+- `bags` (object): Three columns of bag items with images/videos
+- `stories` (array): Story events with audio, timing, and bag selections
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+### Events
+
+- `data` (array): Collection of event objects with timing and metadata
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+### Info
+
+- `en` (string, required): English content
+- `nl` (string, required): Dutch content
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+### User
+
+- `name` (string, required): User's full name
+- `email` (string, required, unique): User's email address
+- `password` (string, required): Hashed password (min 6 characters)
+- `age` (number, optional): User's age (0-120)
+- `createdAt` / `updatedAt` (Date): Auto-generated timestamps
+
+## Example Requests
+
+### Create Storyline
+
+```bash
+POST /api/storylines
+Content-Type: application/json
+
+{
+  "title": "Adventure Story",
+  "bags": {
+    "firstColumn": [...],
+    "secondColumn": [...],
+    "thirdColumn": [...]
+  },
+  "stories": [...]
+}
+```
+
+### Create Events
+
+```bash
+POST /api/events
+Content-Type: application/json
+
+[
+  {
+    "timestamp": "2024-01-01T00:00:00Z",
+    "action": "user_interaction",
+    "metadata": {...}
+  }
+]
+```
+
+### Create Info Content
+
+```bash
+POST /api/info
+Content-Type: application/json
+
+{
+  "en": "English content here",
+  "nl": "Nederlandse inhoud hier"
+}
+```
 
 ## Error Handling
 
-The API returns structured error responses defined in [`ErrorResponse`](src/types/response.ts):
+The API returns structured error responses:
 
 ```json
 {
@@ -172,10 +299,19 @@ The project uses strict TypeScript settings defined in [`tsconfig.json`](tsconfi
 
 ## Security Features
 
-- Password hashing with bcrypt
-- Input validation through Mongoose schemas
-- MongoDB injection protection
+- Password hashing with bcrypt (10 salt rounds)
+- Email validation and uniqueness constraints
+- Input sanitization and validation
+- MongoDB injection protection via Mongoose
 - Environment variable management
+
+## Publishing Workflow
+
+The storyline system supports a preview/published workflow:
+
+1. **Preview Mode**: Create and edit storylines in `preview` status
+2. **Publishing**: Use publish endpoints to promote preview content to `published` status
+3. **Query Filtering**: Filter API responses by status for different environments
 
 ## Contributing
 
