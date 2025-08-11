@@ -3,6 +3,9 @@ dotenv.config();
 
 import express from 'express';
 import usersRoute from './routes/users';
+import storylineRoute from './routes/storyline';
+import infoRoute from './routes/info';
+import eventsRoute from './routes/events';
 import { connectDB, disconnectDB } from './config/database';
 
 const app = express();
@@ -13,7 +16,10 @@ app.get('/', (_, res) => {
 
 // Middleware
 app.use(express.json()); // Parse JSON bodies
-app.use('/users', usersRoute);
+app.use('/api/users', usersRoute);
+app.use('/api/storylines', storylineRoute);
+app.use('/api/info', infoRoute);
+app.use('/api/events', eventsRoute);
 
 const PORT = process.env.PORT || 3000;
 
