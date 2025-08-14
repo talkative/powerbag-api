@@ -1,0 +1,25 @@
+# fly.toml app configuration file generated for powerbag-api on 2025-08-14T13:32:18+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'powerbag-api'
+primary_region = 'arn'
+
+[env]
+  MONGODB_URI="mongodb+srv://powerbag:Mj2TO6e9fUrEDehr@powerbag.g0jhtun.mongodb.net/powerbag_dev?retryWrites=true&w=majority&appName=powerbag"
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

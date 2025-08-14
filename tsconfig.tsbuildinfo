@@ -1,1 +1,1 @@
-{"root":["./src/index.ts"],"version":"5.9.2"}
+{"root":["./index.d.ts","./src/index.ts","./src/config/database.ts","./src/dtos/createuser.dto.ts","./src/handlers/events.ts","./src/handlers/info.ts","./src/handlers/storyline.ts","./src/handlers/users.ts","./src/models/events.ts","./src/models/info.ts","./src/models/storyline.ts","./src/models/user.ts","./src/routes/events.ts","./src/routes/info.ts","./src/routes/storyline.ts","./src/routes/users.ts","./src/types/query-params.ts","./src/types/response.ts"],"version":"5.9.2"}

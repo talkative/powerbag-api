@@ -167,10 +167,10 @@ export async function deleteStoryLine(req: Request, res: Response) {
 
 export async function deleteStoryLines(req: Request, res: Response) {
   try {
-    const result = await StoryLine.deleteMany();
-    res.status(200).json({
-      message: `${result.deletedCount} storylines deleted successfully`,
-    });
+    // const result = await StoryLine.deleteMany();
+    // res.status(200).json({
+    //   message: `${result.deletedCount} storylines deleted successfully`,
+    // });
   } catch (error) {
     console.error('Error deleting storylines:', error);
     res.status(500).json({
