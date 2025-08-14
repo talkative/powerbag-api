@@ -48,6 +48,10 @@ export async function getStoryLine(req: Request, res: Response) {
 }
 
 export async function updateOrCreateStoryLine(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+  /*
   try {
     const storyLineData = req.body;
     const { status = 'preview' } = req.query;
@@ -85,9 +89,16 @@ export async function updateOrCreateStoryLine(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function updateOrCreateStoryLines(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const storyLines: IStoryLine[] = req.body;
     const { status = 'preview' } = req.query;
@@ -135,9 +146,16 @@ export async function updateOrCreateStoryLines(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function deleteStoryLine(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const { id } = req.params;
 
@@ -163,14 +181,21 @@ export async function deleteStoryLine(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function deleteStoryLines(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
-    // const result = await StoryLine.deleteMany();
-    // res.status(200).json({
-    //   message: `${result.deletedCount} storylines deleted successfully`,
-    // });
+    const result = await StoryLine.deleteMany();
+    res.status(200).json({
+      message: `${result.deletedCount} storylines deleted successfully`,
+    });
   } catch (error) {
     console.error('Error deleting storylines:', error);
     res.status(500).json({
@@ -178,6 +203,8 @@ export async function deleteStoryLines(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function checkIfUpdateAvailable(req: Request, res: Response) {
@@ -197,6 +224,11 @@ export async function checkIfUpdateAvailable(req: Request, res: Response) {
 }
 
 export async function publishStoryLine(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const { title } = req.params;
 
@@ -243,9 +275,16 @@ export async function publishStoryLine(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function publishStoryLines(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const previewData = await StoryLine.find({
       status: 'preview',
@@ -289,4 +328,6 @@ export async function publishStoryLines(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }

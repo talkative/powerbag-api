@@ -17,6 +17,11 @@ export async function getEvents(req: Request, res: Response) {
 }
 
 export async function createEvents(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const eventsData: ISingleEvent[] = req.body;
 
@@ -37,9 +42,16 @@ export async function createEvents(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
 
 export async function deleteEvents(req: Request, res: Response) {
+  return res.status(501).json({
+    message: 'This endpoint is not implemented yet',
+  } as ErrorResponse);
+
+  /*
   try {
     const { id } = req.params;
 
@@ -65,4 +77,6 @@ export async function deleteEvents(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
+
+  */
 }
