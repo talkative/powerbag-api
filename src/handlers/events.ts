@@ -2,14 +2,15 @@ import { Request, Response } from 'express';
 import { Events } from '../models/Events';
 import type { ISingleEvent } from '../models/Events';
 import { ErrorResponse } from '../types/response';
+import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
 export async function getEvents(req: Request, res: Response) {
   try {
     const events = await Events.find().sort({ createDate: -1 });
-    res.status(200).json(events);
+    res.status(HTTP_STATUS.OK).json(events);
   } catch (error) {
     console.error('Error getting events:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to retrieve events',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -17,7 +18,7 @@ export async function getEvents(req: Request, res: Response) {
 }
 
 export async function createEvents(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -26,7 +27,7 @@ export async function createEvents(req: Request, res: Response) {
     const eventsData: ISingleEvent[] = req.body;
 
     if (!Array.isArray(eventsData)) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Request body must be an array of events',
       } as ErrorResponse);
     }
@@ -34,10 +35,10 @@ export async function createEvents(req: Request, res: Response) {
     const newEvents = new Events({ data: eventsData });
     await newEvents.save();
 
-    res.status(201).json(newEvents);
+    res.status(HTTP_STATUS.CREATED).json(newEvents);
   } catch (error) {
     console.error('Error creating events:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to create events',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -47,7 +48,7 @@ export async function createEvents(req: Request, res: Response) {
 }
 
 export async function deleteEvents(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -56,7 +57,7 @@ export async function deleteEvents(req: Request, res: Response) {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Event ID is required',
       } as ErrorResponse);
     }
@@ -64,15 +65,15 @@ export async function deleteEvents(req: Request, res: Response) {
     const deletedEvent = await Events.findByIdAndDelete(id);
 
     if (!deletedEvent) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Event not found',
       } as ErrorResponse);
     }
 
-    res.status(200).json({ message: 'Event deleted successfully' });
+    res.status(HTTP_STATUS.OK).json({ message: 'Event deleted successfully' });
   } catch (error) {
     console.error('Error deleting events:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to delete events',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);

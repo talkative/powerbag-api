@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { IStoryLine, StoryLine } from '../models/StoryLine';
 import { ErrorResponse } from '../types/response';
+import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
 export async function getStoryLines(req: Request, res: Response) {
   try {
@@ -14,10 +15,10 @@ export async function getStoryLines(req: Request, res: Response) {
     }
 
     const stories = await StoryLine.find(query);
-    res.status(200).json(stories);
+    res.status(HTTP_STATUS.OK).json(stories);
   } catch (error) {
     console.error('Error getting storylines:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to retrieve storylines',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -32,15 +33,15 @@ export async function getStoryLine(req: Request, res: Response) {
     const story = await StoryLine.findOne({ title, status });
 
     if (!story) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Storyline not found',
       } as ErrorResponse);
     }
 
-    res.status(200).json(story);
+    res.status(HTTP_STATUS.OK).json(story);
   } catch (error) {
     console.error('Error getting storyline:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to retrieve storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -48,7 +49,7 @@ export async function getStoryLine(req: Request, res: Response) {
 }
 
 export async function updateOrCreateStoryLine(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
   /*
@@ -57,7 +58,7 @@ export async function updateOrCreateStoryLine(req: Request, res: Response) {
     const { status = 'preview' } = req.query;
 
     if (!storyLineData.title) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Title is required',
       } as ErrorResponse);
     }
@@ -72,7 +73,7 @@ export async function updateOrCreateStoryLine(req: Request, res: Response) {
       currentStoryLine.stories = storyLineData.stories;
 
       await currentStoryLine.save();
-      res.status(200).json(currentStoryLine);
+      res.status(HTTP_STATUS.OK).json(currentStoryLine);
     } else {
       const newStoryLine = await StoryLine.create({
         ...storyLineData,
@@ -80,21 +81,20 @@ export async function updateOrCreateStoryLine(req: Request, res: Response) {
         status,
       });
 
-      res.status(201).json(newStoryLine);
+      res.status(HTTP_STATUS.CREATED).json(newStoryLine);
     }
   } catch (error) {
     console.error('Error updating/creating storyline:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to update or create storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }
 
 export async function updateOrCreateStoryLines(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -104,7 +104,7 @@ export async function updateOrCreateStoryLines(req: Request, res: Response) {
     const { status = 'preview' } = req.query;
 
     if (!Array.isArray(storyLines)) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Request body must be an array of storylines',
       } as ErrorResponse);
     }
@@ -138,20 +138,19 @@ export async function updateOrCreateStoryLines(req: Request, res: Response) {
       }
     }
 
-    res.status(200).json(_storyLines);
+    res.status(HTTP_STATUS.OK).json(_storyLines);
   } catch (error) {
     console.error('Error updating/creating storylines:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to update or create storylines',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }
 
 export async function deleteStoryLine(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -160,7 +159,7 @@ export async function deleteStoryLine(req: Request, res: Response) {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Storyline ID is required',
       } as ErrorResponse);
     }
@@ -168,55 +167,53 @@ export async function deleteStoryLine(req: Request, res: Response) {
     const result = await StoryLine.deleteOne({ _id: id });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Storyline not found',
       } as ErrorResponse);
     }
 
-    res.status(200).json({ message: 'Storyline deleted successfully' });
+    res.status(HTTP_STATUS.OK).json({ message: 'Storyline deleted successfully' });
   } catch (error) {
     console.error('Error deleting storyline:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to delete storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }
 
 export async function deleteStoryLines(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
   /*
   try {
     const result = await StoryLine.deleteMany();
-    res.status(200).json({
+    res.status(HTTP_STATUS.OK).json({
       message: `${result.deletedCount} storylines deleted successfully`,
     });
   } catch (error) {
     console.error('Error deleting storylines:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to delete storylines',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }
 
 export async function checkIfUpdateAvailable(req: Request, res: Response) {
   try {
     // TODO: Implement update check logic
-    res.status(200).json({
+    res.status(HTTP_STATUS.OK).json({
       message: 'Update check not implemented yet',
       updateAvailable: false,
     });
   } catch (error) {
     console.error('Error checking for updates:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to check for updates',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -224,7 +221,7 @@ export async function checkIfUpdateAvailable(req: Request, res: Response) {
 }
 
 export async function publishStoryLine(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -233,7 +230,7 @@ export async function publishStoryLine(req: Request, res: Response) {
     const { title } = req.params;
 
     if (!title) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Title is required',
       } as ErrorResponse);
     }
@@ -244,7 +241,7 @@ export async function publishStoryLine(req: Request, res: Response) {
     });
 
     if (!previewData) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Preview data not found',
       } as ErrorResponse);
     }
@@ -258,7 +255,7 @@ export async function publishStoryLine(req: Request, res: Response) {
       currentPublished.bags = previewData.bags;
       currentPublished.stories = previewData.stories;
       await currentPublished.save();
-      res.status(200).json(currentPublished);
+      res.status(HTTP_STATUS.OK).json(currentPublished);
     } else {
       const newPublished = await StoryLine.create({
         title: previewData.title,
@@ -266,21 +263,20 @@ export async function publishStoryLine(req: Request, res: Response) {
         stories: previewData.stories,
         status: 'published',
       });
-      res.status(201).json(newPublished);
+      res.status(HTTP_STATUS.CREATED).json(newPublished);
     }
   } catch (error) {
     console.error('Error publishing storyline:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to publish storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }
 
 export async function publishStoryLines(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -291,7 +287,7 @@ export async function publishStoryLines(req: Request, res: Response) {
     });
 
     if (!previewData || previewData.length === 0) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'No preview data found',
       } as ErrorResponse);
     }
@@ -320,14 +316,13 @@ export async function publishStoryLines(req: Request, res: Response) {
       }
     }
 
-    res.status(200).json(publishedStoryLines);
+    res.status(HTTP_STATUS.OK).json(publishedStoryLines);
   } catch (error) {
     console.error('Error publishing storylines:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to publish storylines',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
   */
 }

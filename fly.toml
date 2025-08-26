@@ -8,6 +8,8 @@ primary_region = 'arn'
 
 [env]
   MONGODB_URI="mongodb+srv://powerbag:Mj2TO6e9fUrEDehr@powerbag.g0jhtun.mongodb.net/powerbag_dev?retryWrites=true&w=majority&appName=powerbag"
+  JWT_SECRET="fabd08bd3c53b20274397f87a09afc3d1b86cb5fb467438bdd2dfc625b173478"
+  MANDRILL_KEY="xpmSb8ztJD0LGWbeQCRe-g"
 
 [build]
 

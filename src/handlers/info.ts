@@ -1,21 +1,22 @@
 import { Request, Response } from 'express';
 import { Info } from '../models/Info';
 import { ErrorResponse } from '../types/response';
+import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
 export async function getInfo(req: Request, res: Response) {
   try {
     const info = await Info.findOne();
 
     if (!info) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Info not found',
       } as ErrorResponse);
     }
 
-    res.status(200).json(info);
+    res.status(HTTP_STATUS.OK).json(info);
   } catch (error) {
     console.error('Error getting info:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to retrieve info',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -23,7 +24,7 @@ export async function getInfo(req: Request, res: Response) {
 }
 
 export async function createInfo(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -32,7 +33,7 @@ export async function createInfo(req: Request, res: Response) {
     const { en, nl } = req.body;
 
     if (!en || !nl) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Both English (en) and Dutch (nl) content are required',
       } as ErrorResponse);
     }
@@ -40,7 +41,7 @@ export async function createInfo(req: Request, res: Response) {
     // Check if info already exists
     const existingInfo = await Info.findOne();
     if (existingInfo) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message:
           'Info already exists. Use update endpoint to modify existing info.',
       } as ErrorResponse);
@@ -52,10 +53,10 @@ export async function createInfo(req: Request, res: Response) {
     });
 
     await newInfo.save();
-    res.status(201).json(newInfo);
+    res.status(HTTP_STATUS.CREATED).json(newInfo);
   } catch (error) {
     console.error('Error creating info:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to create info',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
@@ -65,7 +66,7 @@ export async function createInfo(req: Request, res: Response) {
 }
 
 export async function updateInfo(req: Request, res: Response) {
-  return res.status(501).json({
+  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
@@ -76,7 +77,7 @@ export async function updateInfo(req: Request, res: Response) {
     const { en, nl } = req.body;
 
     if (!en || !nl) {
-      return res.status(400).json({
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Both English (en) and Dutch (nl) content are required',
       } as ErrorResponse);
     }
@@ -84,7 +85,7 @@ export async function updateInfo(req: Request, res: Response) {
     const infoToUpdate = await Info.findById(id);
 
     if (!infoToUpdate) {
-      return res.status(404).json({
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Info not found',
       } as ErrorResponse);
     }
@@ -93,10 +94,10 @@ export async function updateInfo(req: Request, res: Response) {
     infoToUpdate.nl = nl;
 
     await infoToUpdate.save();
-    res.status(200).json(infoToUpdate);
+    res.status(HTTP_STATUS.OK).json(infoToUpdate);
   } catch (error) {
     console.error('Error updating info:', error);
-    res.status(500).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to update info',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);

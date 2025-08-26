@@ -2,10 +2,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+
+import { authenticateToken } from './middleware/auth';
+
 import usersRoute from './routes/users';
 import storylineRoute from './routes/storyline';
 import infoRoute from './routes/info';
 import eventsRoute from './routes/events';
+
 import { connectDB, disconnectDB } from './config/database';
 
 const app = express();
@@ -16,6 +20,8 @@ app.get('/', (_, res) => {
 
 // Middleware
 app.use(express.json()); // Parse JSON bodies
+app.use(authenticateToken); // Apply authentication middleware globally
+
 app.use('/api/users', usersRoute);
 app.use('/api/storylines', storylineRoute);
 app.use('/api/info', infoRoute);

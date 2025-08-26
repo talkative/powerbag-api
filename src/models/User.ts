@@ -1,21 +1,19 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface IUser extends Document {
-  _id: string; // MongoDB ObjectId
+export interface IUser extends Document<mongoose.Types.ObjectId> {
   name: string;
   email: string;
-  password: string;
-  age?: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createDate: Date;
+  updateDate: Date;
+  roles: string[]; // Array of roles, e.g., ['member', 'admin']
 }
 
 const UserSchema: Schema = new Schema(
   {
     name: {
       type: String,
-      required: [true, 'Name is required'],
       trim: true,
+      default: '',
       maxlength: [50, 'Name cannot exceed 50 characters'],
     },
     email: {
@@ -29,19 +27,17 @@ const UserSchema: Schema = new Schema(
         'Please enter a valid email',
       ],
     },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters'],
-    },
-    age: {
-      type: Number,
-      min: [0, 'Age cannot be negative'],
-      max: [120, 'Age cannot exceed 120'],
+    roles: {
+      type: [String],
+      enum: ['member', 'admin'],
+      default: ['member'],
     },
   },
   {
-    timestamps: true, // Automatically adds createdAt and updatedAt
+    timestamps: {
+      createdAt: 'createDate',
+      updatedAt: 'updateDate',
+    },
   }
 );
 

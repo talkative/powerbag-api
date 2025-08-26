@@ -6,7 +6,11 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 
 - **TypeScript**: Full type safety and modern JavaScript features
 - **MongoDB Integration**: Robust data persistence with Mongoose ODM
+- **JWT Authentication**: Secure user authentication and authorization
+- **Role-based Access Control**: User roles with member/admin permissions
+- **Email Integration**: Mandrill email service integration
 - **Modular Architecture**: Clean separation of concerns with handlers, routes, and models
+- **HTTP Status Constants**: Centralized HTTP status code management
 - **Input Validation**: Comprehensive data validation and sanitization
 - **Error Handling**: Structured error responses and graceful shutdown
 - **Environment Configuration**: Flexible configuration management
@@ -17,36 +21,46 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 - **Framework**: Express.js
 - **Language**: TypeScript
 - **Database**: MongoDB with Mongoose
-- **Security**: Bcrypt for password hashing
+- **Authentication**: JSON Web Tokens (JWT)
+- **Password Security**: Bcrypt for password hashing
+- **Email Service**: Nodemailer with Mandrill transport
 - **Environment**: dotenv for configuration
 
 ## Project Structure
 
 ```
 src/
-├── index.ts              # Application entry point
+├── index.ts                          # Application entry point
 ├── config/
-│   └── database.ts       # MongoDB connection configuration
+│   └── database.ts                   # MongoDB connection configuration
+├── constants/
+│   └── httpStatusCodes.ts           # HTTP status code constants
 ├── dtos/
-│   └── CreateUser.dto.ts # Data transfer objects
+│   └── CreateUser.dto.ts            # Data transfer objects
 ├── handlers/
-│   ├── events.ts         # Event handlers/controllers
-│   ├── info.ts           # Info content handlers
-│   ├── storyline.ts      # Storyline handlers
-│   └── users.ts          # User handlers
+│   ├── events.ts                    # Event handlers/controllers
+│   ├── info.ts                      # Info content handlers
+│   ├── storyline.ts                 # Storyline handlers
+│   └── users.ts                     # User handlers with auth
+├── middleware/
+│   └── auth.ts                      # JWT authentication middleware
 ├── models/
-│   ├── Events.ts         # Event data model and schema
-│   ├── Info.ts           # Info content model
-│   ├── StoryLine.ts      # Storyline model with bags and stories
-│   └── User.ts           # User model and authentication
+│   ├── Events.ts                    # Event data model and schema
+│   ├── Info.ts                      # Info content model
+│   ├── StoryLine.ts                 # Storyline model with bags and stories
+│   └── User.ts                      # User model with roles and authentication
 ├── routes/
-│   ├── events.ts         # Event API endpoints
-│   ├── info.ts           # Info content endpoints
-│   ├── storyline.ts      # Storyline API endpoints
-│   └── users.ts          # User API endpoints
-└── types/
-    ├── query-params.ts   # Query parameter interfaces
-    └── response.ts       # Response type definitions
+│   ├── events.ts                    # Event API endpoints
+│   ├── info.ts                      # Info content endpoints
+│   ├── storyline.ts                 # Storyline API endpoints
+│   └── users.ts                     # User API endpoints with auth
+├── types/
+│   ├── nodemailer-mandrill-transport.d.ts  # Type declarations for email
+│   ├── query-params.ts              # Query parameter interfaces
+│   └── response.ts                  # Response type definitions
+└── utils/
+    ├── jwt.ts                       # JWT token utilities
+    └── mandrill.ts                  # Email service utilities
 ```
 
 ## Getting Started
@@ -56,6 +70,7 @@ src/
 - Node.js (v16 or higher)
 - MongoDB database
 - npm or yarn package manager
+- Mandrill API key (for email functionality)
 
 ### Installation
 
@@ -84,6 +99,8 @@ cp .env.example .env
 MONGODB_URI=your_mongodb_connection_string
 PORT=3000
 NODE_ENV=development
+JWT_SECRET=your_jwt_secret_key
+MANDRILL_KEY=your_mandrill_api_key
 ```
 
 ### Development
@@ -103,23 +120,47 @@ npm run build
 npm start
 ```
 
+## Authentication
+
+The API uses JWT (JSON Web Tokens) for authentication. Protected endpoints require a valid Bearer token in the Authorization header:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+### User Roles
+
+- **member**: Default role for new users
+- **admin**: Administrative privileges
+
 ## API Endpoints
+
+### Users (`/api/users`)
+
+User account management and authentication:
+
+| Method | Endpoint       | Auth Required | Description              |
+| ------ | -------------- | ------------- | ------------------------ |
+| `GET`  | `/users`       | Yes           | Get all users            |
+| `GET`  | `/users/:id`   | Yes           | Get user by ID           |
+| `POST` | `/users`       | No            | Create new user          |
+| `POST` | `/users/login` | No            | Login user and get token |
 
 ### Storylines (`/api/storylines`)
 
 Complete storyline management with preview/published workflow:
 
-| Method   | Endpoint                     | Description                                |
-| -------- | ---------------------------- | ------------------------------------------ |
-| `GET`    | `/storylines`                | Get all storylines with optional filtering |
-| `GET`    | `/storylines/:title`         | Get specific storyline by title            |
-| `POST`   | `/storylines`                | Create or update a single storyline        |
-| `PUT`    | `/storylines`                | Batch create or update storylines          |
-| `DELETE` | `/storylines/:id`            | Delete specific storyline by ID            |
-| `DELETE` | `/storylines`                | Delete all storylines                      |
-| `GET`    | `/storylines/system/updates` | Check if updates are available             |
-| `POST`   | `/storylines/:title/publish` | Publish specific storyline                 |
-| `POST`   | `/storylines/publish/all`    | Publish all storylines                     |
+| Method   | Endpoint                     | Auth Required | Description                                |
+| -------- | ---------------------------- | ------------- | ------------------------------------------ |
+| `GET`    | `/storylines`                | No            | Get all storylines with optional filtering |
+| `GET`    | `/storylines/:title`         | No            | Get specific storyline by title            |
+| `POST`   | `/storylines`                | Yes           | Create or update a single storyline        |
+| `PUT`    | `/storylines`                | Yes           | Batch create or update storylines          |
+| `DELETE` | `/storylines/:id`            | Yes           | Delete specific storyline by ID            |
+| `DELETE` | `/storylines`                | Yes           | Delete all storylines                      |
+| `GET`    | `/storylines/system/updates` | No            | Check if updates are available             |
+| `POST`   | `/storylines/:title/publish` | Yes           | Publish specific storyline                 |
+| `POST`   | `/storylines/publish/all`    | Yes           | Publish all storylines                     |
 
 **Query Parameters:**
 
@@ -130,33 +171,30 @@ Complete storyline management with preview/published workflow:
 
 Event tracking and management:
 
-| Method   | Endpoint      | Description                              |
-| -------- | ------------- | ---------------------------------------- |
-| `GET`    | `/events`     | Get all events (sorted by creation date) |
-| `POST`   | `/events`     | Create new events collection             |
-| `DELETE` | `/events/:id` | Delete specific event by ID              |
+| Method   | Endpoint      | Auth Required | Description                              |
+| -------- | ------------- | ------------- | ---------------------------------------- |
+| `GET`    | `/events`     | No            | Get all events (sorted by creation date) |
+| `POST`   | `/events`     | Yes           | Create new events collection             |
+| `DELETE` | `/events/:id` | Yes           | Delete specific event by ID              |
 
 ### Info Content (`/api/info`)
 
 Multi-language information content management:
 
-| Method | Endpoint    | Description                  |
-| ------ | ----------- | ---------------------------- |
-| `GET`  | `/info`     | Get info content             |
-| `POST` | `/info`     | Create new info content      |
-| `PUT`  | `/info/:id` | Update existing info content |
-
-### Users (`/api/users`)
-
-User account management:
-
-| Method | Endpoint     | Description     |
-| ------ | ------------ | --------------- |
-| `GET`  | `/users`     | Get all users   |
-| `GET`  | `/users/:id` | Get user by ID  |
-| `POST` | `/users`     | Create new user |
+| Method | Endpoint    | Auth Required | Description                  |
+| ------ | ----------- | ------------- | ---------------------------- |
+| `GET`  | `/info`     | No            | Get info content             |
+| `POST` | `/info`     | Yes           | Create new info content      |
+| `PUT`  | `/info/:id` | Yes           | Update existing info content |
 
 ## Data Models
+
+### User
+
+- `name` (string): User's full name (optional, max 50 characters)
+- `email` (string, required, unique): User's email address with validation
+- `roles` (array): User roles (`['member']` by default, can include `'admin'`)
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
 
 ### StoryLine
 
@@ -177,20 +215,35 @@ User account management:
 - `nl` (string, required): Dutch content
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
 
-### User
-
-- `name` (string, required): User's full name
-- `email` (string, required, unique): User's email address
-- `password` (string, required): Hashed password (min 6 characters)
-- `age` (number, optional): User's age (0-120)
-- `createdAt` / `updatedAt` (Date): Auto-generated timestamps
-
 ## Example Requests
 
-### Create Storyline
+### User Registration
+
+```bash
+POST /api/users
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+
+### User Login
+
+```bash
+POST /api/users/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+
+### Create Storyline (Authenticated)
 
 ```bash
 POST /api/storylines
+Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
 
 {
@@ -204,10 +257,11 @@ Content-Type: application/json
 }
 ```
 
-### Create Events
+### Create Events (Authenticated)
 
 ```bash
 POST /api/events
+Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
 
 [
@@ -219,16 +273,21 @@ Content-Type: application/json
 ]
 ```
 
-### Create Info Content
+## HTTP Status Codes
 
-```bash
-POST /api/info
-Content-Type: application/json
+The API uses centralized HTTP status constants for consistency:
 
-{
-  "en": "English content here",
-  "nl": "Nederlandse inhoud hier"
-}
+```typescript
+import { HTTP_STATUS } from './constants/httpStatusCodes';
+
+// Examples:
+HTTP_STATUS.OK              // 200
+HTTP_STATUS.CREATED         // 201
+HTTP_STATUS.BAD_REQUEST     // 400
+HTTP_STATUS.UNAUTHORIZED    // 401
+HTTP_STATUS.FORBIDDEN       // 403
+HTTP_STATUS.NOT_FOUND       // 404
+HTTP_STATUS.INTERNAL_SERVER_ERROR // 500
 ```
 
 ## Error Handling
@@ -247,24 +306,57 @@ Common HTTP status codes:
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request
+- `401` - Unauthorized
+- `403` - Forbidden
 - `404` - Not Found
 - `500` - Internal Server Error
+- `501` - Not Implemented
 
 ## Environment Variables
 
-| Variable      | Description               | Default                              |
-| ------------- | ------------------------- | ------------------------------------ |
-| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/powerbag` |
-| `PORT`        | Server port               | `3000`                               |
-| `NODE_ENV`    | Environment mode          | `development`                        |
+| Variable       | Description                    | Default                              | Required |
+| -------------- | ------------------------------ | ------------------------------------ | -------- |
+| `MONGODB_URI`  | MongoDB connection string      | `mongodb://localhost:27017/powerbag` | Yes      |
+| `PORT`         | Server port                    | `3000`                               | No       |
+| `NODE_ENV`     | Environment mode               | `development`                        | No       |
+| `JWT_SECRET`   | Secret key for JWT tokens      | -                                    | Yes      |
+| `MANDRILL_KEY` | Mandrill API key for emails    | -                                    | Yes      |
 
-## Database Configuration
+## Email Integration
 
-MongoDB connection is managed through the [`database.ts`](src/config/database.ts) configuration:
+The API includes email functionality using Mandrill:
 
-- **Connection**: Automatic connection on server start
-- **Disconnection**: Graceful disconnection on shutdown
-- **Error Handling**: Comprehensive error logging and recovery
+- **Service**: Nodemailer with Mandrill transport
+- **Templates**: Support for merge variables and templates
+- **Configuration**: Environment-based API key configuration
+
+## Security Features
+
+- **JWT Authentication**: Secure token-based authentication
+- **Role-based Access**: User roles for authorization control
+- **Password Security**: Bcrypt hashing (Note: Currently email-only auth)
+- **Email Validation**: Comprehensive email format validation and uniqueness
+- **Input Sanitization**: Mongoose schema validation
+- **MongoDB Protection**: Injection protection via Mongoose ODM
+- **Environment Security**: Sensitive data in environment variables
+
+## Authentication Middleware
+
+Protected routes use JWT middleware that:
+
+1. **Validates Bearer Token**: Checks Authorization header format
+2. **Verifies JWT**: Validates token signature and expiration
+3. **User Lookup**: Fetches user from database
+4. **Role Attachment**: Attaches user data to request object
+
+## Publishing Workflow
+
+The storyline system supports a preview/published workflow:
+
+1. **Preview Mode**: Create and edit storylines in `preview` status
+2. **Publishing**: Use publish endpoints to promote preview content to `published` status
+3. **Query Filtering**: Filter API responses by status for different environments
+4. **Authentication**: Publishing requires valid JWT token
 
 ## Development Scripts
 
@@ -275,43 +367,30 @@ MongoDB connection is managed through the [`database.ts`](src/config/database.ts
 
 ## TypeScript Configuration
 
-The project uses strict TypeScript settings defined in [`tsconfig.json`](tsconfig.json):
+The project uses strict TypeScript settings with comprehensive type safety:
 
 - **Module System**: Node.js ESNext modules
-- **Strict Mode**: Enabled for type safety
+- **Strict Mode**: Enabled for maximum type safety
 - **Output**: Compiled to `dist/` directory
 - **Source Maps**: Generated for debugging
+- **Custom Declarations**: Type definitions for external modules
 
 ## Architecture Patterns
 
 ### Request Flow
 
-1. **Routes** ([`src/routes/`](src/routes/)) - Define API endpoints
-2. **Handlers** ([`src/handlers/`](src/handlers/)) - Process business logic
-3. **Models** ([`src/models/`](src/models/)) - Database operations
-4. **Response** - Structured JSON responses
+1. **Routes** ([`src/routes/`](src/routes/)) - Define API endpoints and middleware
+2. **Middleware** ([`src/middleware/`](src/middleware/)) - Authentication and validation
+3. **Handlers** ([`src/handlers/`](src/handlers/)) - Process business logic
+4. **Models** ([`src/models/`](src/models/)) - Database operations with Mongoose
+5. **Response** - Structured JSON responses with consistent status codes
 
 ### Type Safety
 
 - **DTOs** ([`src/dtos/`](src/dtos/)) - Request/response data structures
 - **Interfaces** ([`src/types/`](src/types/)) - Shared type definitions
-- **Models** - Mongoose schema with TypeScript interfaces
-
-## Security Features
-
-- Password hashing with bcrypt (10 salt rounds)
-- Email validation and uniqueness constraints
-- Input sanitization and validation
-- MongoDB injection protection via Mongoose
-- Environment variable management
-
-## Publishing Workflow
-
-The storyline system supports a preview/published workflow:
-
-1. **Preview Mode**: Create and edit storylines in `preview` status
-2. **Publishing**: Use publish endpoints to promote preview content to `published` status
-3. **Query Filtering**: Filter API responses by status for different environments
+- **Models** - Mongoose schemas with TypeScript interfaces
+- **Constants** - Centralized HTTP status codes and other constants
 
 ## Contributing
 
