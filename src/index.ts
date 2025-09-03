@@ -9,6 +9,7 @@ import usersRoute from './routes/users';
 import storylineRoute from './routes/storyline';
 import infoRoute from './routes/info';
 import eventsRoute from './routes/events';
+import collectionRoute from './routes/collection';
 
 import { connectDB, disconnectDB } from './config/database';
 
@@ -26,6 +27,7 @@ app.use('/api/users', usersRoute);
 app.use('/api/storylines', storylineRoute);
 app.use('/api/info', infoRoute);
 app.use('/api/events', eventsRoute);
+app.use('/api/collections', collectionRoute);
 
 const PORT = process.env.PORT || 3000;
 

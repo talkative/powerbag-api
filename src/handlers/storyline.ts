@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { IStoryLine, StoryLine } from '../models/StoryLine';
+import { IStoryline, Storyline } from '../models/Storyline';
 import { ErrorResponse } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
-export async function getStoryLines(req: Request, res: Response) {
+export async function getStorylines(req: Request, res: Response) {
   try {
     const { titles, status = 'preview' } = req.query;
 
@@ -14,7 +14,7 @@ export async function getStoryLines(req: Request, res: Response) {
       query.title = { $in: titleArray };
     }
 
-    const stories = await StoryLine.find(query);
+    const stories = await Storyline.find(query);
     res.status(HTTP_STATUS.OK).json(stories);
   } catch (error) {
     console.error('Error getting storylines:', error);
@@ -25,12 +25,12 @@ export async function getStoryLines(req: Request, res: Response) {
   }
 }
 
-export async function getStoryLine(req: Request, res: Response) {
+export async function getStoryline(req: Request, res: Response) {
   try {
     const { title } = req.params;
     const { status = 'preview' } = req.query;
 
-    const story = await StoryLine.findOne({ title, status });
+    const story = await Storyline.findOne({ title, status });
 
     if (!story) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -48,40 +48,40 @@ export async function getStoryLine(req: Request, res: Response) {
   }
 }
 
-export async function updateOrCreateStoryLine(req: Request, res: Response) {
+export async function updateOrCreateStoryline(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
   /*
   try {
-    const storyLineData = req.body;
+    const storylineData = req.body;
     const { status = 'preview' } = req.query;
 
-    if (!storyLineData.title) {
+    if (!storylineData.title) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Title is required',
       } as ErrorResponse);
     }
 
-    const currentStoryLine = await StoryLine.findOne({
-      title: storyLineData.title,
+    const currentStoryline = await Storyline.findOne({
+      title: storylineData.title,
       status,
     });
 
-    if (currentStoryLine) {
-      currentStoryLine.bags = storyLineData.bags;
-      currentStoryLine.stories = storyLineData.stories;
+    if (currentStoryline) {
+      currentStoryline.bags = storylineData.bags;
+      currentStoryline.stories = storylineData.stories;
 
-      await currentStoryLine.save();
-      res.status(HTTP_STATUS.OK).json(currentStoryLine);
+      await currentStoryline.save();
+      res.status(HTTP_STATUS.OK).json(currentStoryline);
     } else {
-      const newStoryLine = await StoryLine.create({
-        ...storyLineData,
-        title: storyLineData.title,
+      const newStoryline = await Storyline.create({
+        ...storylineData,
+        title: storylineData.title,
         status,
       });
 
-      res.status(HTTP_STATUS.CREATED).json(newStoryLine);
+      res.status(HTTP_STATUS.CREATED).json(newStoryline);
     }
   } catch (error) {
     console.error('Error updating/creating storyline:', error);
@@ -93,52 +93,52 @@ export async function updateOrCreateStoryLine(req: Request, res: Response) {
   */
 }
 
-export async function updateOrCreateStoryLines(req: Request, res: Response) {
+export async function updateOrCreateStorylines(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
   /*
   try {
-    const storyLines: IStoryLine[] = req.body;
+    const storylines: IStoryline[] = req.body;
     const { status = 'preview' } = req.query;
 
-    if (!Array.isArray(storyLines)) {
+    if (!Array.isArray(storylines)) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: 'Request body must be an array of storylines',
       } as ErrorResponse);
     }
 
-    const _storyLines = [];
+    const _storylines = [];
 
-    for (let index = 0; index < storyLines.length; index++) {
-      const storyLine = storyLines[index];
+    for (let index = 0; index < storylines.length; index++) {
+      const storyline = storylines[index];
 
-      if (!storyLine || !storyLine.title) continue;
+      if (!storyline || !storyline.title) continue;
 
-      const currentStoryLine = await StoryLine.findOne({
-        title: storyLine.title,
+      const currentStoryline = await Storyline.findOne({
+        title: storyline.title,
         status,
       });
 
-      if (currentStoryLine) {
-        currentStoryLine.bags = storyLine.bags;
-        currentStoryLine.stories = storyLine.stories;
+      if (currentStoryline) {
+        currentStoryline.bags = storyline.bags;
+        currentStoryline.stories = storyline.stories;
 
-        await currentStoryLine.save();
-        _storyLines.push(currentStoryLine);
+        await currentStoryline.save();
+        _storylines.push(currentStoryline);
       } else {
-        const newStoryLine = await StoryLine.create({
-          ...storyLine,
-          title: storyLine.title,
+        const newStoryline = await Storyline.create({
+          ...storyline,
+          title: storyline.title,
           status,
         });
 
-        _storyLines.push(newStoryLine);
+        _storylines.push(newStoryline);
       }
     }
 
-    res.status(HTTP_STATUS.OK).json(_storyLines);
+    res.status(HTTP_STATUS.OK).json(_storylines);
   } catch (error) {
     console.error('Error updating/creating storylines:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -149,7 +149,7 @@ export async function updateOrCreateStoryLines(req: Request, res: Response) {
   */
 }
 
-export async function deleteStoryLine(req: Request, res: Response) {
+export async function deleteStoryline(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
@@ -164,7 +164,7 @@ export async function deleteStoryLine(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    const result = await StoryLine.deleteOne({ _id: id });
+    const result = await Storyline.deleteOne({ _id: id });
 
     if (result.deletedCount === 0) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -183,14 +183,14 @@ export async function deleteStoryLine(req: Request, res: Response) {
   */
 }
 
-export async function deleteStoryLines(req: Request, res: Response) {
+export async function deleteStorylines(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
   /*
   try {
-    const result = await StoryLine.deleteMany();
+    const result = await Storyline.deleteMany();
     res.status(HTTP_STATUS.OK).json({
       message: `${result.deletedCount} storylines deleted successfully`,
     });
@@ -220,7 +220,7 @@ export async function checkIfUpdateAvailable(req: Request, res: Response) {
   }
 }
 
-export async function publishStoryLine(req: Request, res: Response) {
+export async function publishStoryline(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
@@ -235,7 +235,7 @@ export async function publishStoryLine(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    const previewData = await StoryLine.findOne({
+    const previewData = await Storyline.findOne({
       title,
       status: 'preview',
     });
@@ -246,7 +246,7 @@ export async function publishStoryLine(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    const currentPublished = await StoryLine.findOne({
+    const currentPublished = await Storyline.findOne({
       title: previewData.title,
       status: 'published',
     });
@@ -257,7 +257,7 @@ export async function publishStoryLine(req: Request, res: Response) {
       await currentPublished.save();
       res.status(HTTP_STATUS.OK).json(currentPublished);
     } else {
-      const newPublished = await StoryLine.create({
+      const newPublished = await Storyline.create({
         title: previewData.title,
         bags: previewData.bags,
         stories: previewData.stories,
@@ -275,14 +275,14 @@ export async function publishStoryLine(req: Request, res: Response) {
   */
 }
 
-export async function publishStoryLines(req: Request, res: Response) {
+export async function publishStorylines(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
     message: 'This endpoint is not implemented yet',
   } as ErrorResponse);
 
   /*
   try {
-    const previewData = await StoryLine.find({
+    const previewData = await Storyline.find({
       status: 'preview',
     });
 
@@ -292,10 +292,10 @@ export async function publishStoryLines(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    const publishedStoryLines = [];
+    const publishedStorylines = [];
 
     for (const preview of previewData) {
-      const currentPublished = await StoryLine.findOne({
+      const currentPublished = await Storyline.findOne({
         title: preview.title,
         status: 'published',
       });
@@ -304,19 +304,19 @@ export async function publishStoryLines(req: Request, res: Response) {
         currentPublished.bags = preview.bags;
         currentPublished.stories = preview.stories;
         await currentPublished.save();
-        publishedStoryLines.push(currentPublished);
+        publishedStorylines.push(currentPublished);
       } else {
-        const newPublished = await StoryLine.create({
+        const newPublished = await Storyline.create({
           title: preview.title,
           bags: preview.bags,
           stories: preview.stories,
           status: 'published',
         });
-        publishedStoryLines.push(newPublished);
+        publishedStorylines.push(newPublished);
       }
     }
 
-    res.status(HTTP_STATUS.OK).json(publishedStoryLines);
+    res.status(HTTP_STATUS.OK).json(publishedStorylines);
   } catch (error) {
     console.error('Error publishing storylines:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

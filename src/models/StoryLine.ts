@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 export interface IBag {
   id: string;
@@ -27,11 +27,12 @@ export interface IBags {
   thirdColumn: IBag[];
 }
 
-export interface IStoryLine extends Document {
+export interface IStoryline extends Document {
   title: string;
   status: 'preview' | 'published';
   bags: IBags;
   stories: IStory[];
+  collections: mongoose.Types.ObjectId[];
   createDate: Date;
   updateDate: Date;
 }
@@ -66,7 +67,7 @@ const storySchema = new mongoose.Schema(
   { _id: false, timestamps: false }
 );
 
-const StoryLineSchema = new mongoose.Schema(
+const StorylineSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     status: { type: String, required: true, enum: ['preview', 'published'] },
@@ -76,6 +77,12 @@ const StoryLineSchema = new mongoose.Schema(
       thirdColumn: [bagSchema],
     },
     stories: [storySchema],
+    collections: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Collection',
+      },
+    ],
   },
   {
     timestamps: {
@@ -85,6 +92,6 @@ const StoryLineSchema = new mongoose.Schema(
   }
 );
 
-export const StoryLine =
-  (mongoose.models.StoryLine as mongoose.Model<IStoryLine>) ||
-  mongoose.model<IStoryLine>('StoryLine', StoryLineSchema);
+export const Storyline =
+  (mongoose.models.Storyline as mongoose.Model<IStoryline>) ||
+  mongoose.model<IStoryline>('Storyline', StorylineSchema);

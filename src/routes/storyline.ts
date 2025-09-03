@@ -1,26 +1,26 @@
 import { Router } from 'express';
 import {
-  getStoryLines,
-  getStoryLine,
-  updateOrCreateStoryLine,
-  updateOrCreateStoryLines,
-  deleteStoryLine,
-  deleteStoryLines,
+  getStorylines,
+  getStoryline,
+  updateOrCreateStoryline,
+  updateOrCreateStorylines,
+  deleteStoryline,
+  deleteStorylines,
   checkIfUpdateAvailable,
-  publishStoryLine,
-  publishStoryLines,
+  publishStoryline,
+  publishStorylines,
 } from '../handlers/storyline';
 
 const router = Router();
 
-router.get('/', getStoryLines);
-router.get('/:title', getStoryLine);
+router.get('/', getStorylines);
+router.get('/:title', getStoryline);
 router.get('/system/updates', checkIfUpdateAvailable);
-router.post('/', updateOrCreateStoryLine);
-router.put('/', updateOrCreateStoryLines);
-router.delete('/:id', deleteStoryLine);
-router.delete('/', deleteStoryLines);
-router.post('/:title/publish', publishStoryLine);
-router.post('/publish/all', publishStoryLines);
+router.post('/', updateOrCreateStoryline);
+router.put('/', updateOrCreateStorylines);
+router.delete('/:id', deleteStoryline);
+router.delete('/', deleteStorylines);
+router.post('/:title/publish', publishStoryline);
+router.post('/publish/all', publishStorylines);
 
 export default router;
