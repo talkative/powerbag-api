@@ -1,6 +1,6 @@
 # Powerbag API
 
-A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing storylines, events, info content, and users in the Powerbag application.
+A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing storylines, events, info content, collections, and users in the Powerbag application.
 
 ## Features
 
@@ -14,6 +14,8 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 - **Input Validation**: Comprehensive data validation and sanitization
 - **Error Handling**: Structured error responses and graceful shutdown
 - **Environment Configuration**: Flexible configuration management
+- **Preview/Published Workflow**: Dual-state content management system
+- **Collection System**: Organize storylines into collections with unidirectional relationships
 
 ## Tech Stack
 
@@ -38,6 +40,7 @@ src/
 ├── dtos/
 │   └── CreateUser.dto.ts            # Data transfer objects
 ├── handlers/
+│   ├── collections.ts               # Collection handlers/controllers
 │   ├── events.ts                    # Event handlers/controllers
 │   ├── info.ts                      # Info content handlers
 │   ├── storyline.ts                 # Storyline handlers
@@ -45,11 +48,13 @@ src/
 ├── middleware/
 │   └── auth.ts                      # JWT authentication middleware
 ├── models/
+│   ├── Collection.ts                # Collection model for organizing storylines
 │   ├── Events.ts                    # Event data model and schema
 │   ├── Info.ts                      # Info content model
-│   ├── StoryLine.ts                 # Storyline model with bags and stories
+│   ├── Storyline.ts                 # Storyline model with embedded bags
 │   └── User.ts                      # User model with roles and authentication
 ├── routes/
+│   ├── collection.ts                # Collection API endpoints
 │   ├── events.ts                    # Event API endpoints
 │   ├── info.ts                      # Info content endpoints
 │   ├── storyline.ts                 # Storyline API endpoints
@@ -133,6 +138,15 @@ Authorization: Bearer <your_jwt_token>
 - **member**: Default role for new users
 - **admin**: Administrative privileges
 
+## Content Management System
+
+The API features a **preview/published workflow** for content management:
+
+- **Preview**: Draft content for editing and testing
+- **Published**: Live content served to end users
+- **Publishing**: Simple copy operation from preview to published state
+- **Independent Publishing**: Each content type can be published separately
+
 ## API Endpoints
 
 ### Users (`/api/users`)
@@ -167,6 +181,27 @@ Complete storyline management with preview/published workflow:
 - `status` - Filter by status (`preview` or `published`)
 - `titles` - Filter by specific titles (array or single value)
 
+### Collections (`/api/collections`)
+
+Collection management for organizing storylines:
+
+| Method   | Endpoint                                             | Auth Required | Description                      |
+| -------- | ---------------------------------------------------- | ------------- | -------------------------------- |
+| `GET`    | `/collections`                                       | No            | Get all collections              |
+| `GET`    | `/collections/:id`                                   | No            | Get specific collection by ID    |
+| `POST`   | `/collections`                                       | Yes           | Create new collection            |
+| `PUT`    | `/collections/:id`                                   | Yes           | Update existing collection       |
+| `DELETE` | `/collections/:id`                                   | Yes           | Delete collection                |
+| `POST`   | `/collections/:collectionId/storylines/:storylineId` | Yes           | Add storyline to collection      |
+| `DELETE` | `/collections/:collectionId/storylines/:storylineId` | Yes           | Remove storyline from collection |
+| `POST`   | `/collections/:id/publish`                           | Yes           | Publish specific collection      |
+| `POST`   | `/collections/publish/all`                           | Yes           | Publish all collections          |
+
+**Query Parameters:**
+
+- `status` - Filter by status (`preview` or `published`)
+- `includeStorylines` - Include storylines in collection response (`true` or `false`)
+
 ### Events (`/api/events`)
 
 Event tracking and management:
@@ -196,13 +231,23 @@ Multi-language information content management:
 - `roles` (array): User roles (`['member']` by default, can include `'admin'`)
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
 
-### StoryLine
+### Storyline
 
 - `title` (string, required): Storyline title
 - `status` (enum): `'preview'` or `'published'`
-- `bags` (object): Three columns of bag items with images/videos
+- `bags` (object): Three columns of embedded bag objects with images/videos
 - `stories` (array): Story events with audio, timing, and bag selections
+- `collections` (array): References to collections this storyline belongs to
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+### Collection
+
+- `name` (string, required, unique): Collection name
+- `description` (string): Optional collection description
+- `status` (enum): `'preview'` or `'published'`
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+**Note**: Collections use a unidirectional relationship - storylines reference collections, not vice versa.
 
 ### Events
 
@@ -214,6 +259,14 @@ Multi-language information content management:
 - `en` (string, required): English content
 - `nl` (string, required): Dutch content
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+## Data Relationships
+
+### Storyline ↔ Collection Relationship
+
+- **Type**: Many-to-Many (unidirectional)
+- **Implementation**: Storylines store collection IDs in `collections` array
+- **Benefits**: Simple relationship management, no data synchronization issues
 
 ## Example Requests
 
@@ -249,28 +302,56 @@ Content-Type: application/json
 {
   "title": "Adventure Story",
   "bags": {
-    "firstColumn": [...],
+    "firstColumn": [
+      {
+        "id": "bag-001",
+        "imageUrl": "https://example.com/bag1.jpg",
+        "videoUrl": "https://example.com/bag1.mp4",
+        "imageFrameUrls": ["https://example.com/frame1.jpg"]
+      }
+    ],
     "secondColumn": [...],
     "thirdColumn": [...]
   },
-  "stories": [...]
+  "stories": [
+    {
+      "id": "story-1",
+      "audioSrc": "https://example.com/audio.mp3",
+      "selectedBags": ["bag-001"],
+      "events": [...]
+    }
+  ]
 }
 ```
 
-### Create Events (Authenticated)
+### Create Collection and Add Storyline
 
 ```bash
-POST /api/events
+# Create collection
+POST /api/collections
 Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
 
-[
-  {
-    "timestamp": "2024-01-01T00:00:00Z",
-    "action": "user_interaction",
-    "metadata": {...}
-  }
-]
+{
+  "name": "Adventure Collection",
+  "description": "Epic adventure storylines"
+}
+
+# Add storyline to collection
+POST /api/collections/{collection_id}/storylines/{storyline_id}
+Authorization: Bearer <your_jwt_token>
+```
+
+### Publishing Workflow
+
+```bash
+# Publish individual items
+POST /api/storylines/adventure-story/publish
+POST /api/collections/collection-id/publish
+
+# Publish all at once
+POST /api/storylines/publish/all
+POST /api/collections/publish/all
 ```
 
 ## HTTP Status Codes
@@ -281,13 +362,14 @@ The API uses centralized HTTP status constants for consistency:
 import { HTTP_STATUS } from './constants/httpStatusCodes';
 
 // Examples:
-HTTP_STATUS.OK              // 200
-HTTP_STATUS.CREATED         // 201
-HTTP_STATUS.BAD_REQUEST     // 400
-HTTP_STATUS.UNAUTHORIZED    // 401
-HTTP_STATUS.FORBIDDEN       // 403
-HTTP_STATUS.NOT_FOUND       // 404
-HTTP_STATUS.INTERNAL_SERVER_ERROR // 500
+HTTP_STATUS.OK; // 200
+HTTP_STATUS.CREATED; // 201
+HTTP_STATUS.BAD_REQUEST; // 400
+HTTP_STATUS.UNAUTHORIZED; // 401
+HTTP_STATUS.FORBIDDEN; // 403
+HTTP_STATUS.NOT_FOUND; // 404
+HTTP_STATUS.INTERNAL_SERVER_ERROR; // 500
+HTTP_STATUS.NOT_IMPLEMENTED; // 501
 ```
 
 ## Error Handling
@@ -314,13 +396,13 @@ Common HTTP status codes:
 
 ## Environment Variables
 
-| Variable       | Description                    | Default                              | Required |
-| -------------- | ------------------------------ | ------------------------------------ | -------- |
-| `MONGODB_URI`  | MongoDB connection string      | `mongodb://localhost:27017/powerbag` | Yes      |
-| `PORT`         | Server port                    | `3000`                               | No       |
-| `NODE_ENV`     | Environment mode               | `development`                        | No       |
-| `JWT_SECRET`   | Secret key for JWT tokens      | -                                    | Yes      |
-| `MANDRILL_KEY` | Mandrill API key for emails    | -                                    | Yes      |
+| Variable       | Description                 | Default                              | Required |
+| -------------- | --------------------------- | ------------------------------------ | -------- |
+| `MONGODB_URI`  | MongoDB connection string   | `mongodb://localhost:27017/powerbag` | Yes      |
+| `PORT`         | Server port                 | `3000`                               | No       |
+| `NODE_ENV`     | Environment mode            | `development`                        | No       |
+| `JWT_SECRET`   | Secret key for JWT tokens   | -                                    | Yes      |
+| `MANDRILL_KEY` | Mandrill API key for emails | -                                    | Yes      |
 
 ## Email Integration
 
@@ -351,12 +433,25 @@ Protected routes use JWT middleware that:
 
 ## Publishing Workflow
 
-The storyline system supports a preview/published workflow:
+The content management system supports a comprehensive preview/published workflow:
 
-1. **Preview Mode**: Create and edit storylines in `preview` status
-2. **Publishing**: Use publish endpoints to promote preview content to `published` status
-3. **Query Filtering**: Filter API responses by status for different environments
-4. **Authentication**: Publishing requires valid JWT token
+### Content States
+
+- **Preview**: Draft content for editing and testing
+- **Published**: Live content served to end users
+
+### Publishing Process
+
+1. **Create/Edit in Preview**: All content starts as preview
+2. **Test and Validate**: Use preview endpoints for testing
+3. **Publish**: Copy preview content to published state
+4. **Go Live**: Published content is served to end users
+
+### Independent Publishing
+
+- **Storylines**: Publish storylines (which reference bags)
+- **Collections**: Publish collections (which reference storylines)
+- **Batch Operations**: Publish all content of a type at once
 
 ## Development Scripts
 
@@ -385,12 +480,26 @@ The project uses strict TypeScript settings with comprehensive type safety:
 4. **Models** ([`src/models/`](src/models/)) - Database operations with Mongoose
 5. **Response** - Structured JSON responses with consistent status codes
 
+### Data Architecture
+
+- **Embedded Design**: Bags are embedded within storylines as structured objects
+- **Unidirectional Relationships**: Storylines reference collections (not bidirectional)
+- **Status Management**: Each content type has independent preview/published states
+- **Reference Integrity**: Automatic cleanup when collections are deleted
+
 ### Type Safety
 
 - **DTOs** ([`src/dtos/`](src/dtos/)) - Request/response data structures
 - **Interfaces** ([`src/types/`](src/types/)) - Shared type definitions
 - **Models** - Mongoose schemas with TypeScript interfaces
 - **Constants** - Centralized HTTP status codes and other constants
+
+## Performance Considerations
+
+- **Efficient Queries**: Compound indexes for status + identifier lookups
+- **Embedded Objects**: Bags stored within storylines for fast access
+- **Reference Optimization**: Store collection IDs for flexible relationships
+- **Batch Operations**: Support for publishing multiple items at once
 
 ## Contributing
 
