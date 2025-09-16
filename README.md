@@ -1,6 +1,6 @@
 # Powerbag API
 
-A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing storylines, events, info content, collections, and users in the Powerbag application.
+A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing storylines, events, info content, collections, assets, and users in the Powerbag application.
 
 ## Features
 
@@ -9,6 +9,7 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 - **JWT Authentication**: Secure user authentication and authorization
 - **Role-based Access Control**: User roles with member/admin permissions
 - **Email Integration**: Mandrill email service integration
+- **Asset Management**: Complete file upload system with S3 integration for images, videos, and audio
 - **Modular Architecture**: Clean separation of concerns with handlers, routes, and models
 - **HTTP Status Constants**: Centralized HTTP status code management
 - **Input Validation**: Comprehensive data validation and sanitization
@@ -23,6 +24,8 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 - **Framework**: Express.js
 - **Language**: TypeScript
 - **Database**: MongoDB with Mongoose
+- **File Storage**: AWS S3 for asset storage
+- **File Upload**: Multer for multipart form handling
 - **Authentication**: JSON Web Tokens (JWT)
 - **Password Security**: Bcrypt for password hashing
 - **Email Service**: Nodemailer with Mandrill transport
@@ -38,8 +41,10 @@ src/
 ├── constants/
 │   └── httpStatusCodes.ts           # HTTP status code constants
 ├── dtos/
-│   └── CreateUser.dto.ts            # Data transfer objects
+│   ├── CreateAsset.dto.ts           # Asset data transfer objects
+│   └── CreateUser.dto.ts            # User data transfer objects
 ├── handlers/
+│   ├── assets.ts                    # Asset upload and management handlers
 │   ├── collections.ts               # Collection handlers/controllers
 │   ├── events.ts                    # Event handlers/controllers
 │   ├── info.ts                      # Info content handlers
@@ -52,8 +57,15 @@ src/
 │   ├── Events.ts                    # Event data model and schema
 │   ├── Info.ts                      # Info content model
 │   ├── Storyline.ts                 # Storyline model with embedded bags
-│   └── User.ts                      # User model with roles and authentication
+│   ├── User.ts                      # User model with roles and authentication
+│   └── Asset/
+│       ├── BaseAsset.ts             # Base asset model with common properties
+│       ├── ImageAsset.ts            # Image-specific asset model
+│       ├── VideoAsset.ts            # Video-specific asset model
+│       ├── AudioAsset.ts            # Audio-specific asset model
+│       └── index.ts                 # Asset model exports
 ├── routes/
+│   ├── assets.ts                    # Asset API endpoints
 │   ├── collection.ts                # Collection API endpoints
 │   ├── events.ts                    # Event API endpoints
 │   ├── info.ts                      # Info content endpoints
@@ -65,7 +77,8 @@ src/
 │   └── response.ts                  # Response type definitions
 └── utils/
     ├── jwt.ts                       # JWT token utilities
-    └── mandrill.ts                  # Email service utilities
+    ├── mandrill.ts                  # Email service utilities
+    └── s3.ts                        # S3 file storage utilities
 ```
 
 ## Getting Started
@@ -74,6 +87,7 @@ src/
 
 - Node.js (v16 or higher)
 - MongoDB database
+- AWS S3 bucket and credentials
 - npm or yarn package manager
 - Mandrill API key (for email functionality)
 
@@ -106,6 +120,10 @@ PORT=3000
 NODE_ENV=development
 JWT_SECRET=your_jwt_secret_key
 MANDRILL_KEY=your_mandrill_api_key
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=your_aws_region
+AWS_S3_BUCKET=your_s3_bucket_name
 ```
 
 ### Development
@@ -153,12 +171,16 @@ The API features a **preview/published workflow** for content management:
 
 User account management and authentication:
 
-| Method | Endpoint       | Auth Required | Description              |
-| ------ | -------------- | ------------- | ------------------------ |
-| `GET`  | `/users`       | Yes           | Get all users            |
-| `GET`  | `/users/:id`   | Yes           | Get user by ID           |
-| `POST` | `/users`       | No            | Create new user          |
-| `POST` | `/users/login` | No            | Login user and get token |
+| Method   | Endpoint                    | Auth Required | Description                      |
+| -------- | --------------------------- | ------------- | -------------------------------- |
+| `GET`    | `/users`                    | Yes           | Get all users                    |
+| `GET`    | `/users/:id`                | Yes           | Get user by ID                   |
+| `POST`   | `/users`                    | No            | Create new user                  |
+| `POST`   | `/users/login`              | No            | Login user and get token         |
+| `PUT`    | `/users/:id`                | Yes           | Update user details              |
+| `DELETE` | `/users/:id`                | Yes           | Delete user                      |
+| `GET`    | `/users/check-email/:email` | No            | Check if email exists            |
+| `POST`   | `/users/send-totp`          | No            | Send TOTP email for verification |
 
 ### Storylines (`/api/storylines`)
 
@@ -201,6 +223,35 @@ Collection management for organizing storylines:
 
 - `status` - Filter by status (`preview` or `published`)
 - `includeStorylines` - Include storylines in collection response (`true` or `false`)
+
+### Assets (`/api/assets`)
+
+Complete asset management system with S3 integration:
+
+| Method   | Endpoint                        | Auth Required | Description                          |
+| -------- | ------------------------------- | ------------- | ------------------------------------ |
+| `POST`   | `/assets/image/upload`          | Yes           | Upload single image                  |
+| `POST`   | `/assets/video/upload`          | Yes           | Upload single video                  |
+| `POST`   | `/assets/audio/upload`          | Yes           | Upload single audio file             |
+| `POST`   | `/assets/image/upload/multiple` | Yes           | Upload multiple images (max 10)      |
+| `POST`   | `/assets/video/upload/multiple` | Yes           | Upload multiple videos (max 5)       |
+| `POST`   | `/assets/audio/upload/multiple` | Yes           | Upload multiple audio files (max 10) |
+| `GET`    | `/assets/:type`                 | No            | Get assets by type with filtering    |
+| `GET`    | `/assets/detail/:id`            | No            | Get specific asset by ID             |
+| `DELETE` | `/assets/:id`                   | Yes           | Delete asset (S3 and database)       |
+
+**Supported File Types:**
+
+- **Images**: JPEG, JPG, PNG, GIF, WebP, SVG
+- **Videos**: MP4, AVI, QuickTime, WMV, FLV, WebM
+- **Audio**: MP3, WAV, FLAC, AAC, OGG
+
+**Query Parameters for GET `/assets/:type`:**
+
+- `page` - Page number for pagination (default: 1)
+- `limit` - Items per page (default: 10)
+- `tags` - Filter by tags (array or single value)
+- `isPublic` - Filter by public status (`true` or `false`)
 
 ### Events (`/api/events`)
 
@@ -396,13 +447,17 @@ Common HTTP status codes:
 
 ## Environment Variables
 
-| Variable       | Description                 | Default                              | Required |
-| -------------- | --------------------------- | ------------------------------------ | -------- |
-| `MONGODB_URI`  | MongoDB connection string   | `mongodb://localhost:27017/powerbag` | Yes      |
-| `PORT`         | Server port                 | `3000`                               | No       |
-| `NODE_ENV`     | Environment mode            | `development`                        | No       |
-| `JWT_SECRET`   | Secret key for JWT tokens   | -                                    | Yes      |
-| `MANDRILL_KEY` | Mandrill API key for emails | -                                    | Yes      |
+| Variable                | Description                  | Default                              | Required |
+| ----------------------- | ---------------------------- | ------------------------------------ | -------- |
+| `MONGODB_URI`           | MongoDB connection string    | `mongodb://localhost:27017/powerbag` | Yes      |
+| `PORT`                  | Server port                  | `3000`                               | No       |
+| `NODE_ENV`              | Environment mode             | `development`                        | No       |
+| `JWT_SECRET`            | Secret key for JWT tokens    | -                                    | Yes      |
+| `MANDRILL_KEY`          | Mandrill API key for emails  | -                                    | Yes      |
+| `AWS_ACCESS_KEY_ID`     | AWS access key ID for S3     | -                                    | Yes      |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key for S3 | -                                    | Yes      |
+| `AWS_REGION`            | AWS region for S3            | -                                    | Yes      |
+| `AWS_S3_BUCKET`         | AWS S3 bucket name           | -                                    | Yes      |
 
 ## Email Integration
 

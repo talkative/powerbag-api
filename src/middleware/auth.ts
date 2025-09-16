@@ -12,6 +12,7 @@ export const authenticateToken = (
     { method: 'POST', route: '/api/users/send-totp' },
     { method: 'POST', route: '/api/users/login' },
     { method: 'GET', route: '/api/users/check-email' },
+    { method: 'GET', route: '/api/collections' },
     { method: 'GET', route: '/api/storylines' },
     { method: 'GET', route: '/api/info' },
   ];

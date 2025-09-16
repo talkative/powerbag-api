@@ -167,6 +167,29 @@ export async function loginUser(
   }
 }
 
+export async function updateUser(req: Request, res: Response) {
+  try {
+    const userId = req.params.id;
+    const updateData = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: 'User not found' } as ErrorResponse);
+    }
+
+    res.status(HTTP_STATUS.OK).json(updatedUser);
+  } catch (error) {
+    res
+      .status(HTTP_STATUS.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Error updating user', error } as ErrorResponse);
+  }
+}
+
 export async function deleteUser(req: Request, res: Response) {
   const userId = req.params.id;
 
