@@ -189,7 +189,7 @@ Complete storyline management with preview/published workflow:
 | Method   | Endpoint                     | Auth Required | Description                                |
 | -------- | ---------------------------- | ------------- | ------------------------------------------ |
 | `GET`    | `/storylines`                | No            | Get all storylines with optional filtering |
-| `GET`    | `/storylines/:title`         | No            | Get specific storyline by title            |
+| `GET`    | `/storylines/:id`            | No            | Get specific storyline by id               |
 | `POST`   | `/storylines`                | Yes           | Create or update a single storyline        |
 | `PUT`    | `/storylines`                | Yes           | Batch create or update storylines          |
 | `DELETE` | `/storylines/:id`            | Yes           | Delete specific storyline by ID            |

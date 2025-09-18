@@ -14,7 +14,7 @@ import {
 const router = Router();
 
 router.get('/', getStorylines);
-router.get('/:title', getStoryline);
+router.get('/:id', getStoryline);
 router.get('/system/updates', checkIfUpdateAvailable);
 router.post('/', updateOrCreateStoryline);
 router.put('/', updateOrCreateStorylines);

@@ -27,10 +27,9 @@ export async function getStorylines(req: Request, res: Response) {
 
 export async function getStoryline(req: Request, res: Response) {
   try {
-    const { title } = req.params;
-    const { status = 'preview' } = req.query;
+    const { id } = req.params;
 
-    const story = await Storyline.findOne({ title, status });
+    const story = await Storyline.findById(id);
 
     if (!story) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
