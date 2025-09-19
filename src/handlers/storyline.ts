@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import { IStoryline, Storyline } from '../models/Storyline';
+import { Collection } from '../models/Collection';
+import {
+  CreateStorylineDto,
+  UpdateStorylineDto,
+} from '../dtos/CreateStoryline.dto';
 import { ErrorResponse } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
@@ -45,107 +50,6 @@ export async function getStoryline(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-}
-
-export async function updateOrCreateStoryline(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-  /*
-  try {
-    const storylineData = req.body;
-    const { status = 'preview' } = req.query;
-
-    if (!storylineData.title) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        message: 'Title is required',
-      } as ErrorResponse);
-    }
-
-    const currentStoryline = await Storyline.findOne({
-      title: storylineData.title,
-      status,
-    });
-
-    if (currentStoryline) {
-      currentStoryline.bags = storylineData.bags;
-      currentStoryline.stories = storylineData.stories;
-
-      await currentStoryline.save();
-      res.status(HTTP_STATUS.OK).json(currentStoryline);
-    } else {
-      const newStoryline = await Storyline.create({
-        ...storylineData,
-        title: storylineData.title,
-        status,
-      });
-
-      res.status(HTTP_STATUS.CREATED).json(newStoryline);
-    }
-  } catch (error) {
-    console.error('Error updating/creating storyline:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to update or create storyline',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorResponse);
-  }
-  */
-}
-
-export async function updateOrCreateStorylines(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /*
-  try {
-    const storylines: IStoryline[] = req.body;
-    const { status = 'preview' } = req.query;
-
-    if (!Array.isArray(storylines)) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        message: 'Request body must be an array of storylines',
-      } as ErrorResponse);
-    }
-
-    const _storylines = [];
-
-    for (let index = 0; index < storylines.length; index++) {
-      const storyline = storylines[index];
-
-      if (!storyline || !storyline.title) continue;
-
-      const currentStoryline = await Storyline.findOne({
-        title: storyline.title,
-        status,
-      });
-
-      if (currentStoryline) {
-        currentStoryline.bags = storyline.bags;
-        currentStoryline.stories = storyline.stories;
-
-        await currentStoryline.save();
-        _storylines.push(currentStoryline);
-      } else {
-        const newStoryline = await Storyline.create({
-          ...storyline,
-          title: storyline.title,
-          status,
-        });
-
-        _storylines.push(newStoryline);
-      }
-    }
-
-    res.status(HTTP_STATUS.OK).json(_storylines);
-  } catch (error) {
-    console.error('Error updating/creating storylines:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to update or create storylines',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorResponse);
-  }
-  */
 }
 
 export async function deleteStoryline(req: Request, res: Response) {
@@ -324,4 +228,107 @@ export async function publishStorylines(req: Request, res: Response) {
     } as ErrorResponse);
   }
   */
+}
+
+export async function createStoryline(req: Request, res: Response) {
+  try {
+    const { title, collectionId, bags, stories }: CreateStorylineDto = req.body;
+
+    // Validate required fields
+    if (!title || !collectionId) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: 'Title and collectionId are required',
+      } as ErrorResponse);
+    }
+
+    // Check if collection exists
+    const collection = await Collection.findById(collectionId);
+    if (!collection) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: 'Collection not found',
+      } as ErrorResponse);
+    }
+
+    // Check if storyline with same title already exists
+    const existingStoryline = await Storyline.findOne({ title });
+    if (existingStoryline) {
+      return res.status(HTTP_STATUS.CONFLICT).json({
+        message: 'Storyline with this title already exists',
+      } as ErrorResponse);
+    }
+
+    // Create new storyline
+    const newStoryline = new Storyline({
+      title,
+      status: 'preview', // Default to preview
+      collections: [collectionId],
+      bags: bags || {
+        firstColumn: [],
+        secondColumn: [],
+        thirdColumn: [],
+      },
+      stories: stories || [],
+    });
+
+    const savedStoryline = await newStoryline.save();
+
+    return res.status(HTTP_STATUS.CREATED).json({
+      message: 'Storyline created successfully',
+      data: savedStoryline,
+    });
+  } catch (error) {
+    console.error('Error creating storyline:', error);
+    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to create storyline',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+}
+
+export async function updateStoryline(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const updateData: UpdateStorylineDto = req.body;
+
+    // Check if storyline exists
+    const existingStoryline = await Storyline.findById(id);
+
+    if (!existingStoryline) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: 'Storyline not found',
+      } as ErrorResponse);
+    }
+
+    // If title is being updated, check for conflicts
+    if (updateData.title && updateData.title !== existingStoryline.title) {
+      const titleConflict = await Storyline.findOne({
+        title: updateData.title,
+        _id: { $ne: id },
+      });
+
+      if (titleConflict) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          message: 'Storyline with this title already exists',
+        } as ErrorResponse);
+      }
+    }
+
+    // Update storyline
+    const updatedStoryline = await Storyline.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    res.status(HTTP_STATUS.OK).json({
+      message: 'Storyline updated successfully',
+      data: updatedStoryline,
+    });
+  } catch (error) {
+    console.error('Error updating storyline:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to update storyline',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
 }

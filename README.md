@@ -186,17 +186,17 @@ User account management and authentication:
 
 Complete storyline management with preview/published workflow:
 
-| Method   | Endpoint                     | Auth Required | Description                                |
-| -------- | ---------------------------- | ------------- | ------------------------------------------ |
-| `GET`    | `/storylines`                | No            | Get all storylines with optional filtering |
-| `GET`    | `/storylines/:id`            | No            | Get specific storyline by id               |
-| `POST`   | `/storylines`                | Yes           | Create or update a single storyline        |
-| `PUT`    | `/storylines`                | Yes           | Batch create or update storylines          |
-| `DELETE` | `/storylines/:id`            | Yes           | Delete specific storyline by ID            |
-| `DELETE` | `/storylines`                | Yes           | Delete all storylines                      |
-| `GET`    | `/storylines/system/updates` | No            | Check if updates are available             |
-| `POST`   | `/storylines/:title/publish` | Yes           | Publish specific storyline                 |
-| `POST`   | `/storylines/publish/all`    | Yes           | Publish all storylines                     |
+| Method   | Endpoint                     | Auth Required | Description                                  |
+| -------- | ---------------------------- | ------------- | -------------------------------------------- |
+| `GET`    | `/storylines`                | No            | Get all storylines with optional filtering   |
+| `GET`    | `/storylines/:id`            | No            | Get specific storyline by id                 |
+| `POST`   | `/storylines`                | Yes           | Create new storyline (requires collectionId) |
+| `PUT`    | `/storylines/:id`            | Yes           | Update existing storyline                    |
+| `DELETE` | `/storylines/:id`            | Yes           | Delete specific storyline by ID              |
+| `DELETE` | `/storylines`                | Yes           | Delete all storylines                        |
+| `GET`    | `/storylines/system/updates` | No            | Check if updates are available               |
+| `POST`   | `/storylines/:title/publish` | Yes           | Publish specific storyline                   |
+| `POST`   | `/storylines/publish/all`    | Yes           | Publish all storylines                       |
 
 **Query Parameters:**
 

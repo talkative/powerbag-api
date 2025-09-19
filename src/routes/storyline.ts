@@ -2,8 +2,8 @@ import { Router } from 'express';
 import {
   getStorylines,
   getStoryline,
-  updateOrCreateStoryline,
-  updateOrCreateStorylines,
+  createStoryline,
+  updateStoryline,
   deleteStoryline,
   deleteStorylines,
   checkIfUpdateAvailable,
@@ -15,11 +15,15 @@ const router = Router();
 
 router.get('/', getStorylines);
 router.get('/:id', getStoryline);
+
+router.post('/', createStoryline);
+router.put('/:id', updateStoryline);
+
 router.get('/system/updates', checkIfUpdateAvailable);
-router.post('/', updateOrCreateStoryline);
-router.put('/', updateOrCreateStorylines);
+
 router.delete('/:id', deleteStoryline);
 router.delete('/', deleteStorylines);
+
 router.post('/:title/publish', publishStoryline);
 router.post('/publish/all', publishStorylines);
 
