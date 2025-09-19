@@ -53,11 +53,6 @@ export async function getStoryline(req: Request, res: Response) {
 }
 
 export async function deleteStoryline(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /*
   try {
     const { id } = req.params;
 
@@ -75,36 +70,16 @@ export async function deleteStoryline(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    res.status(HTTP_STATUS.OK).json({ message: 'Storyline deleted successfully' });
+    return res
+      .status(HTTP_STATUS.OK)
+      .json({ message: 'Storyline deleted successfully' });
   } catch (error) {
     console.error('Error deleting storyline:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to delete storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-  */
-}
-
-export async function deleteStorylines(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /*
-  try {
-    const result = await Storyline.deleteMany();
-    res.status(HTTP_STATUS.OK).json({
-      message: `${result.deletedCount} storylines deleted successfully`,
-    });
-  } catch (error) {
-    console.error('Error deleting storylines:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to delete storylines',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorResponse);
-  }
-  */
 }
 
 export async function checkIfUpdateAvailable(req: Request, res: Response) {

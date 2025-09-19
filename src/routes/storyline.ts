@@ -5,7 +5,6 @@ import {
   createStoryline,
   updateStoryline,
   deleteStoryline,
-  deleteStorylines,
   checkIfUpdateAvailable,
   publishStoryline,
   publishStorylines,
@@ -22,7 +21,6 @@ router.put('/:id', updateStoryline);
 router.get('/system/updates', checkIfUpdateAvailable);
 
 router.delete('/:id', deleteStoryline);
-router.delete('/', deleteStorylines);
 
 router.post('/:title/publish', publishStoryline);
 router.post('/publish/all', publishStorylines);
