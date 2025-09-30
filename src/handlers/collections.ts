@@ -42,7 +42,28 @@ export async function getCollection(req: Request, res: Response) {
       const storylines = await Storyline.find({
         collections: id,
         status,
-      });
+      }).populate([
+        {
+          path: 'bags.firstColumn.imageAsset',
+          select: 'url originalName',
+        },
+        {
+          path: 'bags.secondColumn.imageAsset',
+          select: 'url originalName',
+        },
+        {
+          path: 'bags.thirdColumn.imageAsset',
+          select: 'url originalName',
+        },
+        {
+          path: 'stories.audioAsset',
+          select: 'url originalName duration',
+        },
+        {
+          path: 'stories.events.videoAsset',
+          select: 'url originalName format',
+        },
+      ]);
 
       result.storylines = storylines;
     }

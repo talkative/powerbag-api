@@ -8,12 +8,15 @@ import {
   checkIfUpdateAvailable,
   publishStoryline,
   publishStorylines,
+  migrateStoryline,
 } from '../handlers/storyline';
 
 const router = Router();
 
 router.get('/', getStorylines);
 router.get('/:id', getStoryline);
+
+router.post('/migrate/:id', migrateStoryline);
 
 router.post('/', createStoryline);
 router.put('/:id', updateStoryline);

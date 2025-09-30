@@ -1,12 +1,18 @@
 import { Request, Response } from 'express';
 import { IStoryline, Storyline } from '../models/Storyline';
 import { Collection } from '../models/Collection';
+import { ImageAsset, AudioAsset } from '../models/Asset';
 import {
   CreateStorylineDto,
   UpdateStorylineDto,
 } from '../dtos/CreateStoryline.dto';
 import { ErrorResponse } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
+
+import {
+  createEmbeddedImageAsset,
+  createEmbeddedAudioAsset,
+} from '../utils/createEmbeddedAsset';
 
 export async function getStorylines(req: Request, res: Response) {
   try {
@@ -19,8 +25,40 @@ export async function getStorylines(req: Request, res: Response) {
       query.title = { $in: titleArray };
     }
 
-    const stories = await Storyline.find(query);
-    res.status(HTTP_STATUS.OK).json(stories);
+    let stories;
+
+    if (status === 'preview') {
+      // For preview storylines, populate asset references with selected fields
+      stories = await Storyline.find(query)
+        .populate([
+          {
+            path: 'bags.firstColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'bags.secondColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'bags.thirdColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'stories.audioAsset',
+            select: 'url originalName duration',
+          },
+          {
+            path: 'stories.events.videoAsset',
+            select: 'url originalName duration format',
+          },
+        ])
+        .sort({ createDate: -1 });
+    } else {
+      // For published storylines, return as-is with embedded data
+      stories = await Storyline.find(query).sort({ createDate: -1 });
+    }
+
+    res.status(HTTP_STATUS.OK).json({ success: true, data: stories });
   } catch (error) {
     console.error('Error getting storylines:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -34,7 +72,28 @@ export async function getStoryline(req: Request, res: Response) {
   try {
     const { id } = req.params;
 
-    const story = await Storyline.findById(id);
+    const story = await Storyline.findById(id).populate([
+      {
+        path: 'bags.firstColumn.imageAsset',
+        select: 'url originalName',
+      },
+      {
+        path: 'bags.secondColumn.imageAsset',
+        select: 'url originalName',
+      },
+      {
+        path: 'bags.thirdColumn.imageAsset',
+        select: 'url originalName',
+      },
+      {
+        path: 'stories.audioAsset',
+        select: 'url originalName duration',
+      },
+      {
+        path: 'stories.events.videoAsset',
+        select: 'url originalName format',
+      },
+    ]);
 
     if (!story) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -47,6 +106,60 @@ export async function getStoryline(req: Request, res: Response) {
     console.error('Error getting storyline:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to retrieve storyline',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+}
+
+export async function migrateStoryline(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+
+    const storyline = await Storyline.findById(id);
+
+    if (!storyline) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: 'Storyline not found',
+      } as ErrorResponse);
+    }
+
+    // Migrate bags
+    for (const columnName of [
+      'firstColumn',
+      'secondColumn',
+      'thirdColumn',
+    ] as const) {
+      const column = storyline.bags[columnName];
+
+      for (const bag of column) {
+        const imageAsset = await ImageAsset.findOne({
+          originalName: `${bag.id}_image.png`,
+        });
+
+        if (imageAsset) {
+          bag.imageAsset = imageAsset._id;
+        }
+      }
+    }
+
+    // Migrate stories
+    for (const story of storyline.stories) {
+      const audioAsset = await AudioAsset.findOne({
+        originalName: `${story.id}_audio.mp3`,
+      });
+
+      if (audioAsset) {
+        story.audioAsset = audioAsset._id;
+      }
+    }
+
+    await storyline.save();
+
+    return res.status(HTTP_STATUS.OK).json({ message: 'Migration completed' });
+  } catch (error) {
+    console.error('Error migrating storyline:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to migrate storyline',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
@@ -98,60 +211,119 @@ export async function checkIfUpdateAvailable(req: Request, res: Response) {
   }
 }
 
-export async function publishStoryline(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /*
+export const publishStoryline = async (req: Request, res: Response) => {
   try {
-    const { title } = req.params;
+    const { id } = req.params;
 
-    if (!title) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        message: 'Title is required',
-      } as ErrorResponse);
+    // Get the preview storyline
+    const previewStoryline = await Storyline.findById(id);
+    if (!previewStoryline) {
+      return res.status(404).json({ message: 'Preview storyline not found' });
     }
 
-    const previewData = await Storyline.findOne({
-      title,
-      status: 'preview',
-    });
-
-    if (!previewData) {
-      return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: 'Preview data not found',
-      } as ErrorResponse);
+    if (previewStoryline.status !== 'preview') {
+      return res
+        .status(400)
+        .json({ message: 'Can only publish preview storylines' });
     }
 
-    const currentPublished = await Storyline.findOne({
-      title: previewData.title,
+    // Check if published version already exists
+    const existingPublished = await Storyline.findOne({
+      previewVersionId: id,
       status: 'published',
     });
 
-    if (currentPublished) {
-      currentPublished.bags = previewData.bags;
-      currentPublished.stories = previewData.stories;
-      await currentPublished.save();
-      res.status(HTTP_STATUS.OK).json(currentPublished);
-    } else {
-      const newPublished = await Storyline.create({
-        title: previewData.title,
-        bags: previewData.bags,
-        stories: previewData.stories,
-        status: 'published',
-      });
-      res.status(HTTP_STATUS.CREATED).json(newPublished);
+    if (existingPublished) {
+      // Delete existing published version to replace it
+      await Storyline.findByIdAndDelete(existingPublished._id);
     }
+
+    // Create published version with embedded assets
+    const publishedData = {
+      title: previewStoryline.title,
+      status: 'published' as const,
+      collections: previewStoryline.collections,
+      previewVersionId: previewStoryline._id,
+      bags: {
+        firstColumn: [] as any[],
+        secondColumn: [] as any[],
+        thirdColumn: [] as any[],
+      },
+      stories: [] as any[],
+    };
+
+    // Process bags and embed ImageAssets
+    for (const columnName of [
+      'firstColumn',
+      'secondColumn',
+      'thirdColumn',
+    ] as const) {
+      const column = previewStoryline.bags[columnName];
+
+      for (const bag of column) {
+        const publishedBag: any = {
+          id: bag.id,
+        };
+
+        if (bag.imageAsset) {
+          const embeddedAsset = await createEmbeddedImageAsset(
+            bag.imageAsset.toString()
+          );
+          if (embeddedAsset) {
+            publishedBag.embeddedImageAsset = embeddedAsset;
+          }
+        }
+
+        // Keep legacy fields for backward compatibility
+        if (bag.imageUrl) publishedBag.imageUrl = bag.imageUrl;
+        if (bag.videoUrl) publishedBag.videoUrl = bag.videoUrl;
+        if (bag.imageFrameUrls)
+          publishedBag.imageFrameUrls = bag.imageFrameUrls;
+
+        publishedData.bags[columnName].push(publishedBag);
+      }
+    }
+
+    // Process stories and embed AudioAssets
+    for (const story of previewStoryline.stories) {
+      const publishedStory: any = {
+        id: story.id,
+        selectedBags: story.selectedBags,
+        events: story.events,
+      };
+
+      if (story.audioAsset) {
+        const embeddedAsset = await createEmbeddedAudioAsset(
+          story.audioAsset.toString()
+        );
+        if (embeddedAsset) {
+          publishedStory.embeddedAudioAsset = embeddedAsset;
+        }
+      }
+
+      // Keep legacy field
+      if (story.audioSrc) publishedStory.audioSrc = story.audioSrc;
+
+      publishedData.stories.push(publishedStory);
+    }
+
+    // Create the published storyline
+    const publishedStoryline = new Storyline(publishedData);
+    await publishedStoryline.save();
+
+    res.json({
+      success: true,
+      message: 'Storyline published successfully',
+      data: {
+        preview: previewStoryline,
+        published: publishedStoryline,
+      },
+    });
   } catch (error) {
     console.error('Error publishing storyline:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to publish storyline',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorResponse);
+    res.status(500).json({ message: 'Failed to publish storyline', error });
   }
-  */
-}
+};
 
 export async function publishStorylines(req: Request, res: Response) {
   return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
@@ -225,10 +397,14 @@ export async function createStoryline(req: Request, res: Response) {
     }
 
     // Check if storyline with same title already exists
-    const existingStoryline = await Storyline.findOne({ title });
+    const existingStoryline = await Storyline.findOne({
+      title,
+      collections: { $in: [collectionId] },
+    });
+
     if (existingStoryline) {
       return res.status(HTTP_STATUS.CONFLICT).json({
-        message: 'Storyline with this title already exists',
+        message: 'Storyline with this title already exists in this collection',
       } as ErrorResponse);
     }
 

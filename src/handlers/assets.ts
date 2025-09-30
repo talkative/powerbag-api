@@ -3,12 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { ImageAsset, VideoAsset, AudioAsset } from '../models/Asset';
-import {
-  CreateImageAssetDto,
-  CreateVideoAssetDto,
-  CreateAudioAssetDto,
-} from '../dtos/CreateAsset.dto';
+import { CreateImageAssetDto } from '../dtos/CreateAsset.dto';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
+import { AuthenticatedRequest } from '../types/response';
 import { S3Service } from '../utils/s3';
 
 // Initialize S3 service
@@ -57,7 +54,22 @@ const fileFilter = (
     audio: ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/aac', 'audio/ogg'],
   };
 
-  const assetType = req.path.split('/')[2]; // Extract asset type from route
+  // Asset type detection from path
+  const pathSegments = req.path.split('/');
+  let assetType: string | undefined;
+
+  // Look for asset type keywords in path segments
+  for (const segment of pathSegments) {
+    if (['image', 'video', 'audio'].includes(segment)) {
+      assetType = segment;
+      break;
+    }
+  }
+
+  if (!assetType) {
+    return cb(new Error('Unable to determine asset type from request path'));
+  }
+
   const validTypes = allowedTypes[assetType as keyof typeof allowedTypes] || [];
 
   if (validTypes.includes(file.mimetype)) {
@@ -92,278 +104,8 @@ const cleanupTempFile = (filePath: string) => {
   }
 };
 
-// Helper function to get image dimensions (simplified - in production, use sharp or similar)
-const getImageDimensions = async (
-  filePath: string
-): Promise<{ width: number; height: number }> => {
-  // This is a placeholder - in production, use a library like sharp to get actual dimensions
-  return { width: 1920, height: 1080 };
-};
-
-// Helper function to get video/audio duration (simplified - in production, use ffprobe or similar)
-const getMediaDuration = async (filePath: string): Promise<number> => {
-  // This is a placeholder - in production, use ffprobe to get actual duration
-  return 120; // 2 minutes placeholder
-};
-
-export const uploadImageAsset = async (req: Request, res: Response) => {
-  let tempFilePath: string | null = null;
-
-  try {
-    if (!req.file) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'No file uploaded',
-      });
-    }
-
-    const userId = (req as any).user?.id;
-    if (!userId) {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        success: false,
-        message: 'User not authenticated',
-      });
-    }
-
-    const { description, tags, isPublic, altText }: CreateImageAssetDto =
-      req.body;
-    const file = req.file;
-    tempFilePath = file.path;
-
-    // Get image dimensions from temporary file
-    const { width, height } = await getImageDimensions(tempFilePath);
-
-    // Generate S3 key and upload to S3
-    const s3Key = s3Service.generateKey(userId, 'image', file.originalname);
-    const s3Url = await s3Service.uploadFile(
-      tempFilePath,
-      s3Key,
-      file.mimetype,
-      {
-        originalName: file.originalname,
-        uploadedBy: userId,
-        assetType: 'image',
-      }
-    );
-
-    // Extract format from mimetype
-    const format = file.mimetype.split('/')[1] as any;
-
-    const imageAsset = new ImageAsset({
-      filename: s3Key, // Store S3 key as filename
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      url: s3Url, // Store S3 URL
-      uploadedBy: userId,
-      tags: tags || [],
-      description,
-      isPublic: isPublic || false,
-      width,
-      height,
-      format,
-      altText,
-    });
-
-    await imageAsset.save();
-
-    // Clean up temporary file
-    cleanupTempFile(tempFilePath);
-
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: 'Image asset uploaded successfully',
-      data: imageAsset,
-    });
-  } catch (error) {
-    // Clean up temporary file in case of error
-    if (tempFilePath) {
-      cleanupTempFile(tempFilePath);
-    }
-
-    console.error('Error uploading image asset:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Failed to upload image asset',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-};
-
-export const uploadVideoAsset = async (req: Request, res: Response) => {
-  let tempFilePath: string | null = null;
-
-  try {
-    if (!req.file) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'No file uploaded',
-      });
-    }
-
-    const userId = (req as any).user?.id;
-    if (!userId) {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        success: false,
-        message: 'User not authenticated',
-      });
-    }
-
-    const { description, tags, isPublic, subtitles }: CreateVideoAssetDto =
-      req.body;
-    const file = req.file;
-    tempFilePath = file.path;
-
-    // Get video duration from temporary file
-    const duration = await getMediaDuration(tempFilePath);
-
-    // Generate S3 key and upload to S3
-    const s3Key = s3Service.generateKey(userId, 'video', file.originalname);
-    const s3Url = await s3Service.uploadFile(
-      tempFilePath,
-      s3Key,
-      file.mimetype,
-      {
-        originalName: file.originalname,
-        uploadedBy: userId,
-        assetType: 'video',
-      }
-    );
-
-    // Extract format from file extension
-    const format = path
-      .extname(file.originalname)
-      .slice(1)
-      .toLowerCase() as any;
-
-    const videoAsset = new VideoAsset({
-      filename: s3Key, // Store S3 key as filename
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      url: s3Url, // Store S3 URL
-      uploadedBy: userId,
-      tags: tags || [],
-      description,
-      isPublic: isPublic || false,
-      duration,
-      format,
-      subtitles,
-    });
-
-    await videoAsset.save();
-
-    // Clean up temporary file
-    cleanupTempFile(tempFilePath);
-
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: 'Video asset uploaded successfully',
-      data: videoAsset,
-    });
-  } catch (error) {
-    // Clean up temporary file in case of error
-    if (tempFilePath) {
-      cleanupTempFile(tempFilePath);
-    }
-
-    console.error('Error uploading video asset:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Failed to upload video asset',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-};
-
-export const uploadAudioAsset = async (req: Request, res: Response) => {
-  let tempFilePath: string | null = null;
-
-  try {
-    if (!req.file) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'No file uploaded',
-      });
-    }
-
-    const userId = (req as any).user?.id;
-    if (!userId) {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        success: false,
-        message: 'User not authenticated',
-      });
-    }
-
-    const { description, tags, isPublic, metadata }: CreateAudioAssetDto =
-      req.body;
-    const file = req.file;
-    tempFilePath = file.path;
-
-    // Get audio duration from temporary file
-    const duration = await getMediaDuration(tempFilePath);
-
-    // Generate S3 key and upload to S3
-    const s3Key = s3Service.generateKey(userId, 'audio', file.originalname);
-    const s3Url = await s3Service.uploadFile(
-      tempFilePath,
-      s3Key,
-      file.mimetype,
-      {
-        originalName: file.originalname,
-        uploadedBy: userId,
-        assetType: 'audio',
-      }
-    );
-
-    // Extract format from file extension
-    const format = path
-      .extname(file.originalname)
-      .slice(1)
-      .toLowerCase() as any;
-
-    const audioAsset = new AudioAsset({
-      filename: s3Key, // Store S3 key as filename
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      url: s3Url, // Store S3 URL
-      uploadedBy: userId,
-      tags: tags || [],
-      description,
-      isPublic: isPublic || false,
-      duration,
-      format,
-      metadata,
-    });
-
-    await audioAsset.save();
-
-    // Clean up temporary file
-    cleanupTempFile(tempFilePath);
-
-    res.status(HTTP_STATUS.CREATED).json({
-      success: true,
-      message: 'Audio asset uploaded successfully',
-      data: audioAsset,
-    });
-  } catch (error) {
-    // Clean up temporary file in case of error
-    if (tempFilePath) {
-      cleanupTempFile(tempFilePath);
-    }
-
-    console.error('Error uploading audio asset:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Failed to upload audio asset',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-};
-
 export const uploadMultipleImageAssets = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response
 ) => {
   const tempFilePaths: string[] = [];
@@ -376,7 +118,8 @@ export const uploadMultipleImageAssets = async (
       });
     }
 
-    const userId = (req as any).user?.id;
+    const userId = req.user?._id;
+
     if (!userId) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
@@ -384,8 +127,7 @@ export const uploadMultipleImageAssets = async (
       });
     }
 
-    const { description, tags, isPublic, altText }: CreateImageAssetDto =
-      req.body;
+    const { altText }: CreateImageAssetDto = req.body;
     const files = req.files as Express.Multer.File[];
 
     // Store temp file paths for cleanup
@@ -397,24 +139,27 @@ export const uploadMultipleImageAssets = async (
     // Process each file
     for (const file of files) {
       try {
-        // Get image dimensions from temporary file
-        const { width, height } = await getImageDimensions(file.path);
-
         // Generate S3 key and upload to S3
-        const s3Key = s3Service.generateKey(userId, 'image', file.originalname);
+        const s3Key = s3Service.generateKey(
+          userId!,
+          'image',
+          file.originalname
+        );
+
         const s3Url = await s3Service.uploadFile(
           file.path,
           s3Key,
           file.mimetype,
           {
             originalName: file.originalname,
-            uploadedBy: userId,
+            uploadedBy: userId!,
             assetType: 'image',
           }
         );
 
         // Extract format from mimetype
         const format = file.mimetype.split('/')[1] as any;
+        const location: string[] = [];
 
         const imageAsset = new ImageAsset({
           filename: s3Key,
@@ -423,11 +168,7 @@ export const uploadMultipleImageAssets = async (
           size: file.size,
           url: s3Url,
           uploadedBy: userId,
-          tags: tags || [],
-          description,
-          isPublic: isPublic || false,
-          width,
-          height,
+          location,
           format,
           altText,
         });
@@ -469,7 +210,7 @@ export const uploadMultipleImageAssets = async (
 };
 
 export const uploadMultipleVideoAssets = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response
 ) => {
   const tempFilePaths: string[] = [];
@@ -482,7 +223,7 @@ export const uploadMultipleVideoAssets = async (
       });
     }
 
-    const userId = (req as any).user?.id;
+    const userId = req.user?._id;
     if (!userId) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
@@ -490,8 +231,6 @@ export const uploadMultipleVideoAssets = async (
       });
     }
 
-    const { description, tags, isPublic, subtitles }: CreateVideoAssetDto =
-      req.body;
     const files = req.files as Express.Multer.File[];
 
     // Store temp file paths for cleanup
@@ -503,9 +242,6 @@ export const uploadMultipleVideoAssets = async (
     // Process each file
     for (const file of files) {
       try {
-        // Get video duration from temporary file
-        const duration = await getMediaDuration(file.path);
-
         // Generate S3 key and upload to S3
         const s3Key = s3Service.generateKey(userId, 'video', file.originalname);
         const s3Url = await s3Service.uploadFile(
@@ -525,6 +261,8 @@ export const uploadMultipleVideoAssets = async (
           .slice(1)
           .toLowerCase() as any;
 
+        const location: string[] = [];
+
         const videoAsset = new VideoAsset({
           filename: s3Key,
           originalName: file.originalname,
@@ -532,12 +270,8 @@ export const uploadMultipleVideoAssets = async (
           size: file.size,
           url: s3Url,
           uploadedBy: userId,
-          tags: tags || [],
-          description,
-          isPublic: isPublic || false,
-          duration,
+          location,
           format,
-          subtitles,
         });
 
         await videoAsset.save();
@@ -577,7 +311,7 @@ export const uploadMultipleVideoAssets = async (
 };
 
 export const uploadMultipleAudioAssets = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response
 ) => {
   const tempFilePaths: string[] = [];
@@ -590,7 +324,7 @@ export const uploadMultipleAudioAssets = async (
       });
     }
 
-    const userId = (req as any).user?.id;
+    const userId = req.user?._id;
     if (!userId) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
@@ -598,8 +332,6 @@ export const uploadMultipleAudioAssets = async (
       });
     }
 
-    const { description, tags, isPublic, metadata }: CreateAudioAssetDto =
-      req.body;
     const files = req.files as Express.Multer.File[];
 
     // Store temp file paths for cleanup
@@ -611,9 +343,6 @@ export const uploadMultipleAudioAssets = async (
     // Process each file
     for (const file of files) {
       try {
-        // Get audio duration from temporary file
-        const duration = await getMediaDuration(file.path);
-
         // Generate S3 key and upload to S3
         const s3Key = s3Service.generateKey(userId, 'audio', file.originalname);
         const s3Url = await s3Service.uploadFile(
@@ -633,6 +362,8 @@ export const uploadMultipleAudioAssets = async (
           .slice(1)
           .toLowerCase() as any;
 
+        const location: string[] = [];
+
         const audioAsset = new AudioAsset({
           filename: s3Key,
           originalName: file.originalname,
@@ -640,12 +371,8 @@ export const uploadMultipleAudioAssets = async (
           size: file.size,
           url: s3Url,
           uploadedBy: userId,
-          tags: tags || [],
-          description,
-          isPublic: isPublic || false,
-          duration,
           format,
-          metadata,
+          location,
         });
 
         await audioAsset.save();
@@ -688,44 +415,51 @@ export const uploadMultipleAudioAssets = async (
 export const getAssetsByType = async (req: Request, res: Response) => {
   try {
     const { type } = req.params;
-    const { page = 1, limit = 10, tags, isPublic } = req.query;
+    const { page = 1, limit = 100, uploadedBy } = req.query;
 
-    const query: any = {};
+    // Build query filter
+    const filter: any = {};
 
-    // Filter by asset type
-    const assetTypeMap: { [key: string]: string } = {
-      image: 'ImageAsset',
-      video: 'VideoAsset',
-      audio: 'AudioAsset',
-    };
-
-    if (type && assetTypeMap[type]) {
-      query.assetType = assetTypeMap[type];
-    } else {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'Invalid asset type. Must be image, video, or audio',
-      });
-    }
-
-    // Additional filters
-    if (tags) {
-      query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
-    }
-
-    if (isPublic !== undefined) {
-      query.isPublic = isPublic === 'true';
+    if (uploadedBy) {
+      filter.uploadedBy = uploadedBy;
     }
 
     const skip = (Number(page) - 1) * Number(limit);
+    let assets: any[] = [];
+    let total = 0;
 
-    const assets = await ImageAsset.find(query)
-      .populate('uploadedBy', 'email')
-      .sort({ createDate: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    const total = await ImageAsset.countDocuments(query);
+    // Query the appropriate model based on type
+    switch (type) {
+      case 'image':
+        assets = await ImageAsset.find(filter)
+          .populate('uploadedBy', 'email')
+          .sort({ createDate: -1 })
+          .skip(skip)
+          .limit(Number(limit));
+        total = await ImageAsset.countDocuments(filter);
+        break;
+      case 'video':
+        assets = await VideoAsset.find(filter)
+          .populate('uploadedBy', 'email')
+          .sort({ createDate: -1 })
+          .skip(skip)
+          .limit(Number(limit));
+        total = await VideoAsset.countDocuments(filter);
+        break;
+      case 'audio':
+        assets = await AudioAsset.find(filter)
+          .populate('uploadedBy', 'email')
+          .sort({ createDate: -1 })
+          .skip(skip)
+          .limit(Number(limit));
+        total = await AudioAsset.countDocuments(filter);
+        break;
+      default:
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid asset type. Must be image, video, or audio',
+        });
+    }
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -747,12 +481,36 @@ export const getAssetsByType = async (req: Request, res: Response) => {
   }
 };
 
-// Get asset by ID
+// Get asset by ID - supports all asset types
 export const getAssetById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const asset = await ImageAsset.findById(id).populate('uploadedBy', 'email');
+    // Try to find the asset in all asset types
+    let asset: any = null;
+    let assetType = '';
+
+    // Try ImageAsset first
+    asset = await ImageAsset.findById(id).populate('uploadedBy', 'email');
+    if (asset) {
+      assetType = 'image';
+    }
+
+    // Try VideoAsset if not found
+    if (!asset) {
+      asset = await VideoAsset.findById(id).populate('uploadedBy', 'email');
+      if (asset) {
+        assetType = 'video';
+      }
+    }
+
+    // Try AudioAsset if still not found
+    if (!asset) {
+      asset = await AudioAsset.findById(id).populate('uploadedBy', 'email');
+      if (asset) {
+        assetType = 'audio';
+      }
+    }
 
     if (!asset) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -763,7 +521,10 @@ export const getAssetById = async (req: Request, res: Response) => {
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      data: asset,
+      data: {
+        ...asset.toObject(),
+        type: assetType,
+      },
     });
   } catch (error) {
     console.error('Error fetching asset:', error);
@@ -775,13 +536,44 @@ export const getAssetById = async (req: Request, res: Response) => {
   }
 };
 
-// Delete asset - now deletes from S3 as well
-export const deleteAsset = async (req: Request, res: Response) => {
+// Delete asset - now deletes from S3 as well and supports all asset types
+export const deleteAsset = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = req.user?._id;
 
-    const asset = await ImageAsset.findById(id);
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+    }
+
+    // Try to find the asset in all asset types
+    let asset: any = null;
+    let assetType = '';
+
+    // Try ImageAsset first
+    asset = await ImageAsset.findById(id);
+    if (asset) {
+      assetType = 'image';
+    }
+
+    // Try VideoAsset if not found
+    if (!asset) {
+      asset = await VideoAsset.findById(id);
+      if (asset) {
+        assetType = 'video';
+      }
+    }
+
+    // Try AudioAsset if still not found
+    if (!asset) {
+      asset = await AudioAsset.findById(id);
+      if (asset) {
+        assetType = 'audio';
+      }
+    }
 
     if (!asset) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -799,21 +591,117 @@ export const deleteAsset = async (req: Request, res: Response) => {
     }
 
     // Delete from S3
-    const s3Key = s3Service.extractKeyFromUrl(asset.url);
-    await s3Service.deleteFile(s3Key);
+    await s3Service.deleteFile(asset.filename);
 
-    // Delete from database
-    await ImageAsset.findByIdAndDelete(id);
+    // Delete from database using the correct model
+    if (assetType === 'image') {
+      await ImageAsset.findByIdAndDelete(id);
+    } else if (assetType === 'video') {
+      await VideoAsset.findByIdAndDelete(id);
+    } else if (assetType === 'audio') {
+      await AudioAsset.findByIdAndDelete(id);
+    }
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      message: 'Asset deleted successfully',
+      message: `${
+        assetType.charAt(0).toUpperCase() + assetType.slice(1)
+      } asset deleted successfully`,
+      data: {
+        id: asset._id,
+        type: assetType,
+        originalName: asset.originalName,
+      },
     });
   } catch (error) {
     console.error('Error deleting asset:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: 'Failed to delete asset',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+// Delete all assets - deletes from S3 and database
+export const deleteAllAssets = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+    }
+
+    // Get all assets for the user
+    const imageAssets = await ImageAsset.find({ uploadedBy: userId });
+    const videoAssets = await VideoAsset.find({ uploadedBy: userId });
+    const audioAssets = await AudioAsset.find({ uploadedBy: userId });
+
+    const allAssets = [
+      ...imageAssets.map((asset) => ({ ...asset.toObject(), type: 'image' })),
+      ...videoAssets.map((asset) => ({ ...asset.toObject(), type: 'video' })),
+      ...audioAssets.map((asset) => ({ ...asset.toObject(), type: 'audio' })),
+    ];
+
+    if (allAssets.length === 0) {
+      return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'No assets found to delete',
+        data: {
+          deletedCount: 0,
+        },
+      });
+    }
+
+    const errors = [];
+    let deletedCount = 0;
+
+    // Delete each asset from S3 and database
+    for (const asset of allAssets) {
+      try {
+        // Delete from S3
+        await s3Service.deleteFile(asset.filename);
+
+        // Delete from database using the correct model
+        if (asset.type === 'image') {
+          await ImageAsset.findByIdAndDelete(asset._id);
+        } else if (asset.type === 'video') {
+          await VideoAsset.findByIdAndDelete(asset._id);
+        } else if (asset.type === 'audio') {
+          await AudioAsset.findByIdAndDelete(asset._id);
+        }
+
+        deletedCount++;
+      } catch (error) {
+        errors.push({
+          id: asset._id,
+          filename: asset.originalName,
+          type: asset.type,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} of ${allAssets.length} assets`,
+      data: {
+        deletedCount,
+        totalAssets: allAssets.length,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (error) {
+    console.error('Error deleting all assets:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to delete all assets',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

@@ -1,9 +1,4 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import fs from 'fs';
 import path from 'path';
@@ -14,7 +9,7 @@ export class S3Service {
 
   constructor() {
     this.s3Client = new S3Client({
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env.AWS_REGION || 'eu-west-1',
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -44,12 +39,9 @@ export class S3Service {
         },
       });
 
-      const result = await upload.done();
+      await upload.done();
 
-      // Return the S3 URL
-      return `https://${this.bucketName}.s3.${
-        process.env.AWS_REGION || 'us-east-1'
-      }.amazonaws.com/${key}`;
+      return `${process.env.CDN_BASE}${key}`;
     } catch (error) {
       console.error('Error uploading to S3:', error);
       throw new Error('Failed to upload file to S3');
@@ -74,11 +66,5 @@ export class S3Service {
     const timestamp = Date.now();
     const extension = path.extname(filename);
     return `assets/${assetType}/${userId}/${timestamp}${extension}`;
-  }
-
-  extractKeyFromUrl(url: string): string {
-    // Extract the S3 key from the full URL
-    const urlParts = url.split('.amazonaws.com/');
-    return urlParts[1] || '';
   }
 }

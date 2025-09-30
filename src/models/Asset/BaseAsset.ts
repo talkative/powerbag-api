@@ -7,9 +7,7 @@ export interface IBaseAsset extends Document<mongoose.Types.ObjectId> {
   size: number;
   url: string;
   uploadedBy: mongoose.Types.ObjectId;
-  tags: string[];
-  description?: string;
-  isPublic: boolean;
+  location: string[];
   createDate: Date;
   updateDate: Date;
 }
@@ -44,18 +42,9 @@ const BaseAssetSchema: Schema = new Schema(
       ref: 'User',
       required: [true, 'Uploader is required'],
     },
-    tags: {
+    location: {
       type: [String],
       default: [],
-    },
-    description: {
-      type: String,
-      trim: true,
-      maxlength: [500, 'Description cannot exceed 500 characters'],
-    },
-    isPublic: {
-      type: Boolean,
-      default: false,
     },
   },
   {
@@ -69,7 +58,8 @@ const BaseAssetSchema: Schema = new Schema(
 
 // Index for efficient queries
 BaseAssetSchema.index({ uploadedBy: 1, assetType: 1 });
-BaseAssetSchema.index({ tags: 1 });
-BaseAssetSchema.index({ isPublic: 1 });
 
-export const BaseAsset = mongoose.model<IBaseAsset>('BaseAsset', BaseAssetSchema);
+export const BaseAsset = mongoose.model<IBaseAsset>(
+  'BaseAsset',
+  BaseAssetSchema
+);

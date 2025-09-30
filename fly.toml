@@ -8,6 +8,9 @@ primary_region = 'arn'
 
 [env]
   MONGODB_URI="mongodb+srv://powerbag:Mj2TO6e9fUrEDehr@powerbag.g0jhtun.mongodb.net/powerbag_dev?retryWrites=true&w=majority&appName=powerbag"
+  CDN_BASE="https://powerbag.imgix.net/"
+  AWS_REGION="eu-west-1"
+  AWS_S3_BUCKET_NAME="powerbag" 
 
 [build]
 

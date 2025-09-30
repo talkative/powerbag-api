@@ -249,9 +249,10 @@ Complete asset management system with S3 integration:
 **Query Parameters for GET `/assets/:type`:**
 
 - `page` - Page number for pagination (default: 1)
-- `limit` - Items per page (default: 10)
+- `limit` - Items per page (default: 100, max: 100)
 - `tags` - Filter by tags (array or single value)
 - `isPublic` - Filter by public status (`true` or `false`)
+- `uploadedBy` - Filter by user ID who uploaded the asset
 
 ### Events (`/api/events`)
 
