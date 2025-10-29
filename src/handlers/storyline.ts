@@ -115,6 +115,7 @@ export async function migrateStoryline(req: Request, res: Response) {
   try {
     const { id } = req.params;
 
+    // Find the storyline with populated collections
     const storyline = await Storyline.findById(id);
 
     if (!storyline) {
@@ -123,7 +124,14 @@ export async function migrateStoryline(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    // Migrate bags
+    let migratedAssets = 0;
+    let updatedLocations = 0;
+
+    // Get collection IDs for location tracking
+    const collectionIds = storyline.collections.join(', ');
+    const locationInfo = `${collectionIds}:${storyline._id}`;
+
+    // Migrate bags and update ImageAsset locations
     for (const columnName of [
       'firstColumn',
       'secondColumn',
@@ -132,30 +140,71 @@ export async function migrateStoryline(req: Request, res: Response) {
       const column = storyline.bags[columnName];
 
       for (const bag of column) {
-        const imageAsset = await ImageAsset.findOne({
-          originalName: `${bag.id}_image.png`,
-        });
-
-        if (imageAsset) {
-          bag.imageAsset = imageAsset._id;
+        // If bag has an imageAsset reference, update its location
+        if (bag.imageAsset) {
+          const imageAsset = await ImageAsset.findById(bag.imageAsset);
+          if (imageAsset) {
+            // Add location if it doesn't already exist
+            if (!imageAsset.location.includes(locationInfo)) {
+              imageAsset.location.push(locationInfo);
+              await imageAsset.save();
+              updatedLocations++;
+              console.log(
+                `Added location to ImageAsset ${imageAsset._id}: ${locationInfo}`
+              );
+            }
+          }
+        } else {
+          // Try to find matching imageAsset by filename pattern (legacy migration)
+          // const imageAsset = await ImageAsset.findOne({
+          //   originalName: `${bag.id}_image.png`,
+          // });
+          // if (imageAsset) {
+          //   bag.imageAsset = imageAsset._id;
+          //   migratedAssets++;
+          //   // Add location tracking
+          //   if (!imageAsset.location.includes(locationInfo)) {
+          //     imageAsset.location.push(locationInfo);
+          //     await imageAsset.save();
+          //     updatedLocations++;
+          //   }
+          //   console.log(
+          //     `Migrated and added location for bag ${bag.id} -> ImageAsset ${imageAsset._id}`
+          //   );
+          // }
         }
       }
     }
 
-    // Migrate stories
-    for (const story of storyline.stories) {
-      const audioAsset = await AudioAsset.findOne({
-        originalName: `${story.id}_audio.mp3`,
-      });
+    // Migrate stories and update AudioAsset locations (if needed)
+    // for (const story of storyline.stories) {
+    //   if (!story.audioAsset) {
+    //     const audioAsset = await AudioAsset.findOne({
+    //       originalName: `${story.id}_audio.mp3`,
+    //     });
 
-      if (audioAsset) {
-        story.audioAsset = audioAsset._id;
-      }
-    }
+    //     if (audioAsset) {
+    //       story.audioAsset = audioAsset._id;
+    //       migratedAssets++;
+    //       console.log(
+    //         `Migrated story ${story.id} -> AudioAsset ${audioAsset._id}`
+    //       );
+    //     }
+    //   }
+    // }
 
     await storyline.save();
 
-    return res.status(HTTP_STATUS.OK).json({ message: 'Migration completed' });
+    return res.status(HTTP_STATUS.OK).json({
+      message: 'Migration completed successfully',
+      details: {
+        migratedAssets,
+        updatedLocations,
+        storylineId: storyline._id,
+        storylineTitle: storyline.title,
+        locationInfo,
+      },
+    });
   } catch (error) {
     console.error('Error migrating storyline:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -436,6 +485,70 @@ export async function createStoryline(req: Request, res: Response) {
   }
 }
 
+// Then create a helper function to resolve names when displaying
+export const resolveLocationNames = async (req: Request, res: Response) => {
+  try {
+    const { locations } = req.body;
+
+    if (!locations || !Array.isArray(locations)) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: 'Locations array is required in request body',
+      } as ErrorResponse);
+    }
+
+    if (locations.length === 0) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: 'Locations array cannot be empty',
+      } as ErrorResponse);
+    }
+
+    const results = [];
+
+    for (const location of locations) {
+      if (typeof location !== 'string') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          message: 'Each location must be a string',
+        } as ErrorResponse);
+      }
+
+      const [collectionId, storylineId] = location.split(':');
+
+      if (!collectionId || !storylineId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          message: `Invalid location format: "${location}". Expected format: collectionId:storylineId`,
+        } as ErrorResponse);
+      }
+
+      const collection = await Collection.findById(collectionId);
+      const storyline = await Storyline.findById(storylineId);
+
+      const result = {
+        originalLocation: location,
+        collectionId,
+        storylineId,
+        collectionName: collection?.name || 'Unknown Collection',
+        storylineName: storyline?.title || 'Unknown Storyline',
+        displayText: `${collection?.name || 'Unknown Collection'} / ${
+          storyline?.title || 'Unknown Storyline'
+        }`,
+      };
+
+      results.push(result);
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      data: results,
+    });
+  } catch (error) {
+    console.error('Error resolving location names:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to resolve location names',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+};
+
 export async function updateStoryline(req: Request, res: Response) {
   try {
     const { id } = req.params;
@@ -455,7 +568,10 @@ export async function updateStoryline(req: Request, res: Response) {
       const titleConflict = await Storyline.findOne({
         title: updateData.title,
         _id: { $ne: id },
+        collections: { $in: existingStoryline.collections },
       });
+
+      console.log('titleConflict', titleConflict);
 
       if (titleConflict) {
         return res.status(HTTP_STATUS.CONFLICT).json({

@@ -118,6 +118,8 @@ export const uploadMultipleImageAssets = async (
       });
     }
 
+    console.log('req.user:', req.user);
+
     const userId = req.user?._id;
 
     if (!userId) {

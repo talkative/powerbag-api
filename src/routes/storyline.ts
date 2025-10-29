@@ -9,11 +9,13 @@ import {
   publishStoryline,
   publishStorylines,
   migrateStoryline,
+  resolveLocationNames,
 } from '../handlers/storyline';
 
 const router = Router();
 
 router.get('/', getStorylines);
+router.post('/resolve-locations', resolveLocationNames);
 router.get('/:id', getStoryline);
 
 router.post('/migrate/:id', migrateStoryline);

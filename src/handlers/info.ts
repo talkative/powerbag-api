@@ -66,12 +66,6 @@ export async function createInfo(req: Request, res: Response) {
 }
 
 export async function updateInfo(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /* 
-
   try {
     const { id } = req.params;
     const { en, nl } = req.body;
@@ -102,6 +96,4 @@ export async function updateInfo(req: Request, res: Response) {
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
-
-  */
 }

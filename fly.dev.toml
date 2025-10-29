@@ -3,15 +3,15 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'powerbag-api'
+app = 'powerbag-dev-api'
 primary_region = 'arn'
 
 [env]
-  MONGODB_URI="mongodb+srv://powerbag:Mj2TO6e9fUrEDehr@powerbag.g0jhtun.mongodb.net/powerbag_prod?retryWrites=true&w=majority&appName=powerbag"
+  MONGODB_URI="mongodb+srv://powerbag:Mj2TO6e9fUrEDehr@powerbag.g0jhtun.mongodb.net/powerbag_dev?retryWrites=true&w=majority&appName=powerbag"
   CDN_BASE="https://powerbag.imgix.net/"
   AWS_REGION="eu-west-1"
   AWS_S3_BUCKET_NAME="powerbag"
-  SITE_URL="https://powerbag.fly.dev/admin"
+  SITE_URL="https://powerbag-dev.fly.dev/admin"
 
 [build]
 

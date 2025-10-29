@@ -6,6 +6,7 @@ export interface IUser extends Document<mongoose.Types.ObjectId> {
   createDate: Date;
   updateDate: Date;
   roles: string[]; // Array of roles, e.g., ['member', 'admin']
+  lastLoggedIn?: Date;
 }
 
 const UserSchema: Schema = new Schema(
@@ -32,6 +33,7 @@ const UserSchema: Schema = new Schema(
       enum: ['member', 'admin'],
       default: ['member'],
     },
+    lastLoggedIn: { type: Date },
   },
   {
     timestamps: {

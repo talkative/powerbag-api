@@ -13,7 +13,6 @@ const CollectionSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
     },
     description: {
       type: String,
@@ -25,6 +24,10 @@ const CollectionSchema = new mongoose.Schema(
       enum: ['preview', 'published'],
       default: 'preview',
     },
+    previewVersionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Collection',
+    },
   },
   {
     timestamps: {
@@ -34,6 +37,9 @@ const CollectionSchema = new mongoose.Schema(
   }
 );
 
-export const Collection =
-  (mongoose.models.Collection as mongoose.Model<ICollection>) ||
-  mongoose.model<ICollection>('Collection', CollectionSchema);
+CollectionSchema.index({ name: 1, status: 1 }, { unique: true });
+
+export const Collection = mongoose.model<ICollection>(
+  'Collection',
+  CollectionSchema
+);

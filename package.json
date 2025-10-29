@@ -6,7 +6,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc --build",
     "start": "node ./dist/index.js",
-    "dev": "nodemon ./src/index.ts"
+    "dev": "nodemon ./src/index.ts",
+    "deploy:dev": "fly deploy --config fly.dev.toml",
+    "deploy:prod": "fly deploy --config fly.toml"
   },
   "keywords": [],
   "author": "",

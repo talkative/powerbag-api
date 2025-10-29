@@ -269,7 +269,6 @@ export async function publishCollection(req: Request, res: Response) {
   try {
     const { id } = req.params;
 
-    // Get the preview version
     const previewCollection = await Collection.findOne({
       _id: id,
       status: 'preview',
@@ -281,26 +280,29 @@ export async function publishCollection(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
-    // Check if published version already exists
+    // Check if published version already exists by previewVersionId
     const existingPublished = await Collection.findOne({
-      name: previewCollection.name,
+      previewVersionId: id,
       status: 'published',
     });
 
     if (existingPublished) {
-      // Update existing published version with preview data
+      // Update existing published version
+      existingPublished.name = previewCollection.name;
       existingPublished.description = previewCollection.description || '';
-
       await existingPublished.save();
+
       res.status(HTTP_STATUS.OK).json(existingPublished);
     } else {
-      // Create new published version by copying preview
-      const publishedCollection = await Collection.create({
+      // Create new published version
+      const publishedCollection = new Collection({
         name: previewCollection.name,
         description: previewCollection.description,
         status: 'published',
+        previewVersionId: previewCollection._id, // Link back to preview
       });
 
+      await publishedCollection.save();
       res.status(HTTP_STATUS.CREATED).json(publishedCollection);
     }
   } catch (error) {

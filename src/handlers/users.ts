@@ -66,6 +66,22 @@ export async function createUser(
 
     const savedUser = await newUser.save();
 
+    try {
+      await sendEmail({
+        to: savedUser.email,
+        subject: 'You are invited to join Verhalen Machine',
+        template_name: 'Powerbag_user_invite',
+        merge_vars: [
+          {
+            name: 'INVITE_LINK',
+            content: `${process.env.SITE_URL}/admin`,
+          },
+        ],
+      });
+    } catch (error) {
+      console.error('Error sending invitation email:', error);
+    }
+
     res.status(HTTP_STATUS.CREATED).send(savedUser);
   } catch (error) {
     if (error instanceof Error && error.name === 'ValidationError') {
@@ -104,7 +120,7 @@ export async function sendTotpEmail(req: Request, res: Response) {
   try {
     await sendEmail({
       to: email,
-      subject: 'Your code for Powerbag login',
+      subject: 'Your code for Verhalen Machine login',
       template_name: 'Powerbag_signin_code',
       merge_vars: [
         {
@@ -149,6 +165,11 @@ export async function loginUser(
 
     // Generate JWT token
     const token = generateToken(user);
+
+    // Update lastLoggedIn timestamp
+    user.lastLoggedIn = new Date();
+
+    user.save();
 
     res.status(HTTP_STATUS.OK).json({
       token,
