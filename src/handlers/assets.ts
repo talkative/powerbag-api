@@ -50,6 +50,7 @@ const fileFilter = (
       'video/x-ms-wmv',
       'video/x-flv',
       'video/webm',
+      'application/octet-stream', // for some mov files
     ],
     audio: ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/aac', 'audio/ogg'],
   };
@@ -118,8 +119,6 @@ export const uploadMultipleImageAssets = async (
       });
     }
 
-    console.log('req.user:', req.user);
-
     const userId = req.user?._id;
 
     if (!userId) {
@@ -137,10 +136,32 @@ export const uploadMultipleImageAssets = async (
 
     const uploadedAssets = [];
     const errors = [];
+    const skippedFiles = [];
 
     // Process each file
     for (const file of files) {
       try {
+        // Check if file already exists by comparing:
+        // 1. originalName
+        // 2. size
+        // 3. mimeType
+        const existingAsset = await ImageAsset.findOne({
+          originalName: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+          uploadedBy: userId, // Only check for the current user's files
+        });
+
+        if (existingAsset) {
+          skippedFiles.push({
+            filename: file.originalname,
+            reason: 'File already exists',
+            existingAssetId: existingAsset._id,
+            existingAssetUrl: existingAsset.url,
+          });
+          continue; // Skip this file
+        }
+
         // Generate S3 key and upload to S3
         const s3Key = s3Service.generateKey(
           userId!,
@@ -188,11 +209,24 @@ export const uploadMultipleImageAssets = async (
     // Clean up all temporary files
     tempFilePaths.forEach(cleanupTempFile);
 
+    // Create response message
+    let message = '';
+    if (uploadedAssets.length > 0) {
+      message += `Successfully uploaded ${uploadedAssets.length} image asset(s). `;
+    }
+    if (skippedFiles.length > 0) {
+      message += `Skipped ${skippedFiles.length} duplicate file(s). `;
+    }
+    if (errors.length > 0) {
+      message += `Failed to upload ${errors.length} file(s).`;
+    }
+
     const response = {
       success: true,
-      message: `Successfully uploaded ${uploadedAssets.length} of ${files.length} image assets`,
+      message: message.trim(),
       data: {
         uploaded: uploadedAssets,
+        skipped: skippedFiles.length > 0 ? skippedFiles : undefined,
         errors: errors.length > 0 ? errors : undefined,
       },
     };
@@ -240,10 +274,32 @@ export const uploadMultipleVideoAssets = async (
 
     const uploadedAssets = [];
     const errors = [];
+    const skippedFiles = [];
 
     // Process each file
     for (const file of files) {
       try {
+        // Check if file already exists by comparing:
+        // 1. originalName
+        // 2. size
+        // 3. mimeType
+        const existingAsset = await VideoAsset.findOne({
+          originalName: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+          uploadedBy: userId, // Only check for the current user's files
+        });
+
+        if (existingAsset) {
+          skippedFiles.push({
+            filename: file.originalname,
+            reason: 'File already exists',
+            existingAssetId: existingAsset._id,
+            existingAssetUrl: existingAsset.url,
+          });
+          continue; // Skip this file
+        }
+
         // Generate S3 key and upload to S3
         const s3Key = s3Service.generateKey(userId, 'video', file.originalname);
         const s3Url = await s3Service.uploadFile(
@@ -289,11 +345,24 @@ export const uploadMultipleVideoAssets = async (
     // Clean up all temporary files
     tempFilePaths.forEach(cleanupTempFile);
 
+    // Create response message
+    let message = '';
+    if (uploadedAssets.length > 0) {
+      message += `Successfully uploaded ${uploadedAssets.length} video asset(s). `;
+    }
+    if (skippedFiles.length > 0) {
+      message += `Skipped ${skippedFiles.length} duplicate file(s). `;
+    }
+    if (errors.length > 0) {
+      message += `Failed to upload ${errors.length} file(s).`;
+    }
+
     const response = {
       success: true,
-      message: `Successfully uploaded ${uploadedAssets.length} of ${files.length} video assets`,
+      message: message.trim(),
       data: {
         uploaded: uploadedAssets,
+        skipped: skippedFiles.length > 0 ? skippedFiles : undefined,
         errors: errors.length > 0 ? errors : undefined,
       },
     };
@@ -341,10 +410,32 @@ export const uploadMultipleAudioAssets = async (
 
     const uploadedAssets = [];
     const errors = [];
+    const skippedFiles = [];
 
     // Process each file
     for (const file of files) {
       try {
+        // Check if file already exists by comparing:
+        // 1. originalName
+        // 2. size
+        // 3. mimeType
+        const existingAsset = await AudioAsset.findOne({
+          originalName: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+          uploadedBy: userId, // Only check for the current user's files
+        });
+
+        if (existingAsset) {
+          skippedFiles.push({
+            filename: file.originalname,
+            reason: 'File already exists',
+            existingAssetId: existingAsset._id,
+            existingAssetUrl: existingAsset.url,
+          });
+          continue; // Skip this file
+        }
+
         // Generate S3 key and upload to S3
         const s3Key = s3Service.generateKey(userId, 'audio', file.originalname);
         const s3Url = await s3Service.uploadFile(
@@ -390,11 +481,24 @@ export const uploadMultipleAudioAssets = async (
     // Clean up all temporary files
     tempFilePaths.forEach(cleanupTempFile);
 
+    // Create response message
+    let message = '';
+    if (uploadedAssets.length > 0) {
+      message += `Successfully uploaded ${uploadedAssets.length} audio asset(s). `;
+    }
+    if (skippedFiles.length > 0) {
+      message += `Skipped ${skippedFiles.length} duplicate file(s). `;
+    }
+    if (errors.length > 0) {
+      message += `Failed to upload ${errors.length} file(s).`;
+    }
+
     const response = {
       success: true,
-      message: `Successfully uploaded ${uploadedAssets.length} of ${files.length} audio assets`,
+      message: message.trim(),
       data: {
         uploaded: uploadedAssets,
+        skipped: skippedFiles.length > 0 ? skippedFiles : undefined,
         errors: errors.length > 0 ? errors : undefined,
       },
     };
