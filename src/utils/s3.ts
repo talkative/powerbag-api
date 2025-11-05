@@ -18,6 +18,26 @@ export class S3Service {
     this.bucketName = process.env.AWS_S3_BUCKET_NAME!;
   }
 
+  private async validateFile(filePath: string): Promise<void> {
+    try {
+      // Check if file exists and is readable
+      await fs.promises.access(filePath, fs.constants.R_OK);
+
+      // Check file stats
+      const stats = await fs.promises.stat(filePath);
+      if (stats.size === 0) {
+        throw new Error('File is empty');
+      }
+
+      console.log(
+        `File validation passed: ${filePath}, size: ${stats.size} bytes`
+      );
+    } catch (error) {
+      console.error('File validation failed:', error);
+      throw new Error('File validation failed');
+    }
+  }
+
   async uploadFile(
     filePath: string,
     key: string,
@@ -25,8 +45,10 @@ export class S3Service {
     metadata?: Record<string, string>
   ): Promise<string> {
     try {
+      // Validate file first
+      await this.validateFile(filePath);
+
       const fileStream = fs.createReadStream(filePath);
-      const fileStats = fs.statSync(filePath);
 
       const upload = new Upload({
         client: this.s3Client,

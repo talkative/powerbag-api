@@ -86,6 +86,42 @@ const fileFilter = (
   }
 };
 
+const sanitizeFilename = (key: string): string => {
+  return (
+    key
+      // Replace special Nordic/European characters
+      .replace(/[åÅ]/g, 'a')
+      .replace(/[äÄ]/g, 'a')
+      .replace(/[öÖ]/g, 'o')
+      .replace(/[æÆ]/g, 'ae')
+      .replace(/[øØ]/g, 'o')
+      .replace(/[ñÑ]/g, 'n')
+      .replace(/[ç]/g, 'c')
+      .replace(/[ß]/g, 'ss')
+      // Replace accented characters
+      .replace(/[àáâãäå]/g, 'a')
+      .replace(/[ÀÁÂÃÄÅ]/g, 'A')
+      .replace(/[èéêë]/g, 'e')
+      .replace(/[ÈÉÊË]/g, 'E')
+      .replace(/[ìíîï]/g, 'i')
+      .replace(/[ÌÍÎÏ]/g, 'I')
+      .replace(/[òóôõö]/g, 'o')
+      .replace(/[ÒÓÔÕÖ]/g, 'O')
+      .replace(/[ùúûü]/g, 'u')
+      .replace(/[ÙÚÛÜ]/g, 'U')
+      .replace(/[ýÿ]/g, 'y')
+      .replace(/[ÝŸ]/g, 'Y')
+      // Remove any remaining non-ASCII characters and special symbols
+      .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // Replace remaining special chars with underscore
+      // Clean up multiple underscores and dots
+      .replace(/_+/g, '_') // Multiple underscores to single
+      .replace(/\.+/g, '.') // Multiple dots to single
+      // Remove leading/trailing underscores and dots
+      .replace(/^[._]+|[._]+$/g, '')
+  );
+};
+
 export const upload = multer({
   storage,
   fileFilter,
@@ -145,8 +181,10 @@ export const uploadMultipleImageAssets = async (
         // 1. originalName
         // 2. size
         // 3. mimeType
+
+        const originalName = sanitizeFilename(file.originalname);
         const existingAsset = await ImageAsset.findOne({
-          originalName: file.originalname,
+          originalName: originalName,
           size: file.size,
           mimeType: file.mimetype,
           uploadedBy: userId, // Only check for the current user's files
@@ -154,7 +192,7 @@ export const uploadMultipleImageAssets = async (
 
         if (existingAsset) {
           skippedFiles.push({
-            filename: file.originalname,
+            filename: originalName,
             reason: 'File already exists',
             existingAssetId: existingAsset._id,
             existingAssetUrl: existingAsset.url,
@@ -163,18 +201,14 @@ export const uploadMultipleImageAssets = async (
         }
 
         // Generate S3 key and upload to S3
-        const s3Key = s3Service.generateKey(
-          userId!,
-          'image',
-          file.originalname
-        );
+        const s3Key = s3Service.generateKey(userId!, 'image', originalName);
 
         const s3Url = await s3Service.uploadFile(
           file.path,
           s3Key,
           file.mimetype,
           {
-            originalName: file.originalname,
+            originalName: originalName,
             uploadedBy: userId!,
             assetType: 'image',
           }
@@ -186,7 +220,7 @@ export const uploadMultipleImageAssets = async (
 
         const imageAsset = new ImageAsset({
           filename: s3Key,
-          originalName: file.originalname,
+          originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
           url: s3Url,
@@ -283,8 +317,11 @@ export const uploadMultipleVideoAssets = async (
         // 1. originalName
         // 2. size
         // 3. mimeType
+
+        const originalName = sanitizeFilename(file.originalname);
+
         const existingAsset = await VideoAsset.findOne({
-          originalName: file.originalname,
+          originalName: originalName,
           size: file.size,
           mimeType: file.mimetype,
           uploadedBy: userId, // Only check for the current user's files
@@ -292,7 +329,7 @@ export const uploadMultipleVideoAssets = async (
 
         if (existingAsset) {
           skippedFiles.push({
-            filename: file.originalname,
+            filename: originalName,
             reason: 'File already exists',
             existingAssetId: existingAsset._id,
             existingAssetUrl: existingAsset.url,
@@ -301,13 +338,14 @@ export const uploadMultipleVideoAssets = async (
         }
 
         // Generate S3 key and upload to S3
-        const s3Key = s3Service.generateKey(userId, 'video', file.originalname);
+        const s3Key = s3Service.generateKey(userId, 'video', originalName);
+
         const s3Url = await s3Service.uploadFile(
           file.path,
           s3Key,
           file.mimetype,
           {
-            originalName: file.originalname,
+            originalName: originalName,
             uploadedBy: userId,
             assetType: 'video',
           }
@@ -323,7 +361,7 @@ export const uploadMultipleVideoAssets = async (
 
         const videoAsset = new VideoAsset({
           filename: s3Key,
-          originalName: file.originalname,
+          originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
           url: s3Url,
@@ -419,8 +457,9 @@ export const uploadMultipleAudioAssets = async (
         // 1. originalName
         // 2. size
         // 3. mimeType
+        const originalName = sanitizeFilename(file.originalname);
         const existingAsset = await AudioAsset.findOne({
-          originalName: file.originalname,
+          originalName: originalName,
           size: file.size,
           mimeType: file.mimetype,
           uploadedBy: userId, // Only check for the current user's files
@@ -428,7 +467,7 @@ export const uploadMultipleAudioAssets = async (
 
         if (existingAsset) {
           skippedFiles.push({
-            filename: file.originalname,
+            filename: originalName,
             reason: 'File already exists',
             existingAssetId: existingAsset._id,
             existingAssetUrl: existingAsset.url,
@@ -437,29 +476,26 @@ export const uploadMultipleAudioAssets = async (
         }
 
         // Generate S3 key and upload to S3
-        const s3Key = s3Service.generateKey(userId, 'audio', file.originalname);
+        const s3Key = s3Service.generateKey(userId, 'audio', originalName);
         const s3Url = await s3Service.uploadFile(
           file.path,
           s3Key,
           file.mimetype,
           {
-            originalName: file.originalname,
+            originalName: originalName,
             uploadedBy: userId,
             assetType: 'audio',
           }
         );
 
         // Extract format from file extension
-        const format = path
-          .extname(file.originalname)
-          .slice(1)
-          .toLowerCase() as any;
+        const format = path.extname(originalName).slice(1).toLowerCase() as any;
 
         const location: string[] = [];
 
         const audioAsset = new AudioAsset({
           filename: s3Key,
-          originalName: file.originalname,
+          originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
           url: s3Url,

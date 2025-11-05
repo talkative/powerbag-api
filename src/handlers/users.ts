@@ -15,7 +15,7 @@ import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
 export async function getUsers(req: Request, res: Response) {
   try {
-    const users = await User.find().select('-password'); // Exclude password from response
+    const users = await User.find().populate('assignedCollections');
     res.send(users);
   } catch (error) {
     res
@@ -28,7 +28,7 @@ export async function getUserById(req: Request, res: Response) {
   const userId = req.params.id;
 
   try {
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).populate('assignedCollections');
 
     if (!user) {
       return res

@@ -8,6 +8,7 @@ export interface JwtPayload {
   email: string;
   name: string;
   roles: string[];
+  assignedCollections: string[];
 }
 
 export const generateToken = (user: IUser): string => {
@@ -16,6 +17,7 @@ export const generateToken = (user: IUser): string => {
     email: user.email,
     name: user.name,
     roles: user.roles,
+    assignedCollections: user.assignedCollections.map((id) => id.toString()),
   };
 
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });

@@ -7,6 +7,7 @@ export interface IUser extends Document<mongoose.Types.ObjectId> {
   updateDate: Date;
   roles: string[]; // Array of roles, e.g., ['member', 'admin']
   lastLoggedIn?: Date;
+  assignedCollections: mongoose.Types.ObjectId[];
 }
 
 const UserSchema: Schema = new Schema(
@@ -34,6 +35,12 @@ const UserSchema: Schema = new Schema(
       default: ['member'],
     },
     lastLoggedIn: { type: Date },
+    assignedCollections: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Collection',
+      },
+    ],
   },
   {
     timestamps: {
