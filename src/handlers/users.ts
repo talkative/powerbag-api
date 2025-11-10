@@ -16,6 +16,7 @@ import { HTTP_STATUS } from '../constants/httpStatusCodes';
 export async function getUsers(req: Request, res: Response) {
   try {
     const users = await User.find().populate('assignedCollections');
+
     res.send(users);
   } catch (error) {
     res

@@ -1,16 +1,41 @@
 import { Request, Response } from 'express';
 import { Collection, ICollection } from '../models/Collection';
-import { Storyline } from '../models/Storyline';
+import { Storyline, IStoryline } from '../models/Storyline';
 import { ErrorResponse } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
+import mongoose from 'mongoose';
 
 export async function getCollections(req: Request, res: Response) {
   try {
-    const { status = 'preview' } = req.query;
+    const { status = 'preview', includeLastUpdatedContent = 'false' } =
+      req.query;
 
     const collections = await Collection.find({ status }).sort({
       createDate: -1,
     });
+
+    // If includeLastUpdatedContent is requested, fetch the latest storyline update for each collection
+    if (includeLastUpdatedContent === 'true') {
+      const collectionsWithContent = await Promise.all(
+        collections.map(async (collection) => {
+          // Find the most recently updated storyline in this collection
+          const latestStoryline = await Storyline.findOne({
+            collections: collection._id,
+            status,
+          })
+            .sort({ updateDate: -1 })
+            .select('updateDate')
+            .lean();
+
+          return {
+            ...collection.toObject(),
+            lastUpdatedContent: latestStoryline?.updateDate || null,
+          };
+        })
+      );
+
+      return res.status(HTTP_STATUS.OK).json(collectionsWithContent);
+    }
 
     res.status(HTTP_STATUS.OK).json(collections);
   } catch (error) {
@@ -25,7 +50,11 @@ export async function getCollections(req: Request, res: Response) {
 export async function getCollection(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { status = 'preview', includeStorylines = 'false' } = req.query;
+    const {
+      status = 'preview',
+      includeStorylines = 'false',
+      includeLastUpdatedContent = 'false',
+    } = req.query;
 
     const collection = await Collection.findOne({ _id: id, status });
 
@@ -42,30 +71,48 @@ export async function getCollection(req: Request, res: Response) {
       const storylines = await Storyline.find({
         collections: id,
         status,
-      }).populate([
-        {
-          path: 'bags.firstColumn.imageAsset',
-          select: 'url originalName',
-        },
-        {
-          path: 'bags.secondColumn.imageAsset',
-          select: 'url originalName',
-        },
-        {
-          path: 'bags.thirdColumn.imageAsset',
-          select: 'url originalName',
-        },
-        {
-          path: 'stories.audioAsset',
-          select: 'url originalName duration',
-        },
-        {
-          path: 'stories.events.videoAsset',
-          select: 'url originalName format',
-        },
-      ]);
+      })
+        .sort({ updateDate: -1 }) // Sort by most recently updated
+        .populate([
+          {
+            path: 'bags.firstColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'bags.secondColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'bags.thirdColumn.imageAsset',
+            select: 'url originalName',
+          },
+          {
+            path: 'stories.audioAsset',
+            select: 'url originalName duration',
+          },
+          {
+            path: 'stories.events.videoAsset',
+            select: 'url originalName format',
+          },
+        ]);
 
       result.storylines = storylines;
+
+      // If we're including storylines and they want lastUpdatedContent, use the first storyline's updateDate
+      if (includeLastUpdatedContent === 'true' && storylines[0]) {
+        result.lastUpdatedContent = storylines[0].updateDate;
+      }
+    } else if (includeLastUpdatedContent === 'true') {
+      // If not including full storylines but want lastUpdatedContent, just get the latest updateDate
+      const latestStoryline = await Storyline.findOne({
+        collections: id,
+        status,
+      })
+        .sort({ updateDate: -1 })
+        .select('updateDate')
+        .lean();
+
+      result.lastUpdatedContent = latestStoryline?.updateDate || null;
     }
 
     res.status(HTTP_STATUS.OK).json(result);
@@ -280,6 +327,15 @@ export async function publishCollection(req: Request, res: Response) {
       } as ErrorResponse);
     }
 
+    // Get all storylines that belong to this collection
+    const previewStorylines = await Storyline.find({
+      collections: id,
+      status: 'preview',
+    });
+
+    let publishedCollection;
+    let publishedStorylines = [];
+
     // Check if published version already exists by previewVersionId
     const existingPublished = await Collection.findOne({
       previewVersionId: id,
@@ -287,24 +343,74 @@ export async function publishCollection(req: Request, res: Response) {
     });
 
     if (existingPublished) {
-      // Update existing published version
+      // Update existing published collection
       existingPublished.name = previewCollection.name;
       existingPublished.description = previewCollection.description || '';
-      await existingPublished.save();
+      existingPublished.publishedDate = new Date();
 
-      res.status(HTTP_STATUS.OK).json(existingPublished);
+      await existingPublished.save();
+      publishedCollection = existingPublished;
     } else {
-      // Create new published version
-      const publishedCollection = new Collection({
+      // Create new published collection
+      publishedCollection = new Collection({
         name: previewCollection.name,
         description: previewCollection.description,
         status: 'published',
         previewVersionId: previewCollection._id, // Link back to preview
+        publishedDate: new Date(),
       });
 
       await publishedCollection.save();
-      res.status(HTTP_STATUS.CREATED).json(publishedCollection);
     }
+
+    // Publish all storylines in this collection
+    for (const previewStoryline of previewStorylines) {
+      // Check if published version of this storyline already exists
+      const existingPublishedStoryline = await Storyline.findOne({
+        previewVersionId: previewStoryline._id,
+        status: 'published',
+      });
+
+      if (existingPublishedStoryline) {
+        // Update existing published storyline
+        existingPublishedStoryline.title = previewStoryline.title;
+        existingPublishedStoryline.bags = previewStoryline.bags;
+        existingPublishedStoryline.stories = previewStoryline.stories;
+
+        // Update collections to reference the published collection
+        // Update the line that's causing the error:
+        existingPublishedStoryline.collections = [
+          publishedCollection._id as mongoose.Types.ObjectId,
+        ];
+
+        await existingPublishedStoryline.save();
+        publishedStorylines.push(existingPublishedStoryline);
+      } else {
+        // Create new published storyline
+        const publishedStoryline = new Storyline({
+          title: previewStoryline.title,
+          bags: previewStoryline.bags,
+          stories: previewStoryline.stories,
+          collections: [publishedCollection._id], // Reference the published collection
+          status: 'published',
+          previewVersionId: previewStoryline._id, // Link back to preview
+        });
+
+        await publishedStoryline.save();
+        publishedStorylines.push(publishedStoryline);
+      }
+    }
+
+    // Mark the preview collection with publishedDate
+    previewCollection.publishedDate = new Date();
+    await previewCollection.save();
+
+    res.status(HTTP_STATUS.OK).json({
+      message: 'Collection and storylines published successfully',
+      collection: publishedCollection,
+      publishedStorylines: publishedStorylines.length,
+      storylines: publishedStorylines,
+    });
   } catch (error) {
     console.error('Error publishing collection:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -314,45 +420,308 @@ export async function publishCollection(req: Request, res: Response) {
   }
 }
 
-export async function publishAllCollections(req: Request, res: Response) {
+// Add this new function to your collections handler
+export async function compareCollectionVersions(req: Request, res: Response) {
   try {
-    const previewCollections = await Collection.find({ status: 'preview' });
+    const { id } = req.params;
 
-    if (!previewCollections || previewCollections.length === 0) {
+    // Get the preview collection
+    const previewCollection = await Collection.findOne({
+      _id: id,
+      status: 'preview',
+    });
+
+    if (!previewCollection) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: 'No preview collections found',
+        message: 'Preview collection not found',
       } as ErrorResponse);
     }
 
-    const publishedCollections = [];
+    // Get the published version (if it exists)
+    const publishedCollection = await Collection.findOne({
+      previewVersionId: id,
+      status: 'published',
+    });
 
-    for (const preview of previewCollections) {
-      const existingPublished = await Collection.findOne({
-        name: preview.name,
+    // Get all preview storylines in this collection
+    const previewStorylines = await Storyline.find({
+      collections: { $in: [id] },
+      status: 'preview',
+    }).sort({ title: 1 });
+
+    // Get all published storylines (if published collection exists)
+    let publishedStorylines: IStoryline[] = [];
+
+    if (publishedCollection) {
+      publishedStorylines = await Storyline.find({
+        collections: { $in: [publishedCollection._id] },
         status: 'published',
-      });
+      }).sort({ title: 1 });
+    }
 
-      if (existingPublished) {
-        existingPublished.description = preview.description || '';
+    // Collection comparison
+    const collectionChanges = {
+      hasChanges: false,
+      changes: [] as string[],
+    };
 
-        await existingPublished.save();
-        publishedCollections.push(existingPublished);
-      } else {
-        const publishedCollection = await Collection.create({
-          name: preview.name,
-          description: preview.description,
-          status: 'published',
-        });
-
-        publishedCollections.push(publishedCollection);
+    if (!publishedCollection) {
+      collectionChanges.hasChanges = true;
+      collectionChanges.changes.push('Collection has never been published');
+    } else {
+      if (previewCollection.name !== publishedCollection.name) {
+        collectionChanges.hasChanges = true;
+        collectionChanges.changes.push(
+          `Name changed: "${publishedCollection.name}" → "${previewCollection.name}"`
+        );
+      }
+      if (previewCollection.description !== publishedCollection.description) {
+        collectionChanges.hasChanges = true;
+        collectionChanges.changes.push(`Description changed`);
       }
     }
 
-    res.status(HTTP_STATUS.OK).json(publishedCollections);
+    // Storyline comparison
+    const storylineComparison = {
+      newStorylines: [] as any[],
+      modifiedStorylines: [] as any[],
+      unchangedStorylines: [] as any[],
+      removedStorylines: [] as any[],
+    };
+
+    // Check each preview storyline
+    for (const previewStoryline of previewStorylines) {
+      const matchingPublished = publishedStorylines.find(
+        (ps) =>
+          ps.previewVersionId?.toString() === previewStoryline._id?.toString()
+      );
+
+      if (!matchingPublished) {
+        // New storyline that doesn't exist in published version
+        storylineComparison.newStorylines.push({
+          _id: previewStoryline._id,
+          title: previewStoryline.title,
+          lastModified: previewStoryline.updateDate,
+        });
+      } else {
+        // Compare the storylines to see if they've changed
+        const changes = compareStorylineContent(
+          previewStoryline,
+          matchingPublished
+        );
+
+        if (changes.length > 0) {
+          storylineComparison.modifiedStorylines.push({
+            _id: previewStoryline._id,
+            title: previewStoryline.title,
+            publishedTitle: matchingPublished.title,
+            lastModified: previewStoryline.updateDate,
+            lastPublished: matchingPublished.updateDate,
+            changes: changes,
+          });
+        } else {
+          storylineComparison.unchangedStorylines.push({
+            _id: previewStoryline._id,
+            title: previewStoryline.title,
+            lastModified: previewStoryline.updateDate,
+            lastPublished: matchingPublished.updateDate,
+          });
+        }
+      }
+    }
+
+    // Check for removed storylines (exist in published but not in preview)
+    if (publishedCollection) {
+      for (const publishedStoryline of publishedStorylines) {
+        const stillExists = previewStorylines.find(
+          (ps) =>
+            ps._id?.toString() ===
+            publishedStoryline.previewVersionId?.toString()
+        );
+
+        if (!stillExists) {
+          storylineComparison.removedStorylines.push({
+            _id: publishedStoryline._id,
+            title: publishedStoryline.title,
+            previewVersionId: publishedStoryline.previewVersionId,
+          });
+        }
+      }
+    }
+
+    // Determine if publishing is recommended
+    const needsPublishing =
+      collectionChanges.hasChanges ||
+      storylineComparison.newStorylines.length > 0 ||
+      storylineComparison.modifiedStorylines.length > 0 ||
+      storylineComparison.removedStorylines.length > 0;
+
+    // Summary statistics
+    const summary = {
+      needsPublishing,
+      lastPublished: previewCollection.publishedDate,
+      totalPreviewStorylines: previewStorylines.length,
+      totalPublishedStorylines: publishedStorylines.length,
+      newStorylines: storylineComparison.newStorylines.length,
+      modifiedStorylines: storylineComparison.modifiedStorylines.length,
+      unchangedStorylines: storylineComparison.unchangedStorylines.length,
+      removedStorylines: storylineComparison.removedStorylines.length,
+    };
+
+    res.status(HTTP_STATUS.OK).json({
+      message: 'Collection versions compared successfully',
+      collection: {
+        preview: {
+          _id: previewCollection._id,
+          name: previewCollection.name,
+          description: previewCollection.description,
+          lastModified: previewCollection.updateDate,
+          publishedDate: previewCollection.publishedDate,
+        },
+        published: publishedCollection
+          ? {
+              _id: publishedCollection._id,
+              name: publishedCollection.name,
+              description: publishedCollection.description,
+              lastModified: publishedCollection.updateDate,
+            }
+          : null,
+      },
+      collectionChanges,
+      storylines: storylineComparison,
+      summary,
+    });
   } catch (error) {
-    console.error('Error publishing all collections:', error);
+    console.error('Error comparing collection versions:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to publish all collections',
+      message: 'Failed to compare collection versions',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+}
+
+// Helper function to compare storyline content
+function compareStorylineContent(preview: any, published: any): string[] {
+  const changes: string[] = [];
+
+  // Compare basic fields
+  if (preview.title !== published.title) {
+    changes.push(`Title: "${published.title}" → "${preview.title}"`);
+  }
+
+  // Compare bags
+  if (JSON.stringify(preview.bags) !== JSON.stringify(published.bags)) {
+    changes.push('Bags content modified');
+  }
+
+  // Compare stories
+  if (JSON.stringify(preview.stories) !== JSON.stringify(published.stories)) {
+    changes.push('Stories content modified');
+  }
+
+  // Check if preview was modified after published version
+  if (preview.updateDate > published.updateDate) {
+    changes.push('Preview version newer than published');
+  }
+
+  return changes;
+}
+
+// Add a simpler endpoint to just check if publishing is needed
+export async function checkPublishingStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+
+    const previewCollection = await Collection.findOne({
+      _id: id,
+      status: 'preview',
+    });
+
+    if (!previewCollection) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: 'Preview collection not found',
+      } as ErrorResponse);
+    }
+
+    const publishedCollection = await Collection.findOne({
+      previewVersionId: id,
+      status: 'published',
+    });
+
+    // Quick check: if never published, definitely needs publishing
+    if (!publishedCollection) {
+      return res.status(HTTP_STATUS.OK).json({
+        needsPublishing: true,
+        reason: 'Collection has never been published',
+        lastPublished: null,
+      });
+    }
+
+    // Check if collection itself has changes
+    const collectionHasChanges =
+      previewCollection.name !== publishedCollection.name ||
+      previewCollection.description !== publishedCollection.description;
+
+    if (collectionHasChanges) {
+      return res.status(HTTP_STATUS.OK).json({
+        needsPublishing: true,
+        reason: 'Collection details have changed',
+        lastPublished: previewCollection.publishedDate,
+      });
+    }
+
+    // Check storylines modification dates
+    const previewStorylines = await Storyline.find({
+      collections: { $in: [id] },
+      status: 'preview',
+    }).select('_id updateDate');
+
+    const publishedStorylines = await Storyline.find({
+      collections: { $in: [publishedCollection._id] },
+      status: 'published',
+    }).select('_id updateDate previewVersionId');
+
+    // Check for new or modified storylines
+    let hasChanges = false;
+    let changeReason = '';
+
+    // Different number of storylines
+    if (previewStorylines.length !== publishedStorylines.length) {
+      hasChanges = true;
+      changeReason = 'Number of storylines has changed';
+    } else {
+      // Check if any preview storyline is newer than its published version
+      for (const previewStoryline of previewStorylines) {
+        const matchingPublished = publishedStorylines.find(
+          (ps) =>
+            ps.previewVersionId?.toString() === previewStoryline._id?.toString()
+        );
+
+        if (!matchingPublished) {
+          hasChanges = true;
+          changeReason = 'New storyline(s) found';
+          break;
+        }
+
+        if (previewStoryline.updateDate > matchingPublished.updateDate) {
+          hasChanges = true;
+          changeReason = 'Storyline(s) have been modified';
+          break;
+        }
+      }
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+      needsPublishing: hasChanges,
+      reason: hasChanges ? changeReason : 'No changes detected',
+      lastPublished: previewCollection.publishedDate,
+      previewStorylines: previewStorylines.length,
+      publishedStorylines: publishedStorylines.length,
+    });
+  } catch (error) {
+    console.error('Error checking publishing status:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to check publishing status',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }

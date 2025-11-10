@@ -9,11 +9,6 @@ import {
 import { ErrorResponse } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
-import {
-  createEmbeddedImageAsset,
-  createEmbeddedAudioAsset,
-} from '../utils/createEmbeddedAsset';
-
 export async function getStorylines(req: Request, res: Response) {
   try {
     const { titles, status = 'preview' } = req.query;
@@ -54,7 +49,6 @@ export async function getStorylines(req: Request, res: Response) {
         ])
         .sort({ createDate: -1 });
     } else {
-      // For published storylines, return as-is with embedded data
       stories = await Storyline.find(query).sort({ createDate: -1 });
     }
 
@@ -260,172 +254,6 @@ export async function checkIfUpdateAvailable(req: Request, res: Response) {
   }
 }
 
-export const publishStoryline = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    // Get the preview storyline
-    const previewStoryline = await Storyline.findById(id);
-    if (!previewStoryline) {
-      return res.status(404).json({ message: 'Preview storyline not found' });
-    }
-
-    if (previewStoryline.status !== 'preview') {
-      return res
-        .status(400)
-        .json({ message: 'Can only publish preview storylines' });
-    }
-
-    // Check if published version already exists
-    const existingPublished = await Storyline.findOne({
-      previewVersionId: id,
-      status: 'published',
-    });
-
-    if (existingPublished) {
-      // Delete existing published version to replace it
-      await Storyline.findByIdAndDelete(existingPublished._id);
-    }
-
-    // Create published version with embedded assets
-    const publishedData = {
-      title: previewStoryline.title,
-      status: 'published' as const,
-      collections: previewStoryline.collections,
-      previewVersionId: previewStoryline._id,
-      bags: {
-        firstColumn: [] as any[],
-        secondColumn: [] as any[],
-        thirdColumn: [] as any[],
-      },
-      stories: [] as any[],
-    };
-
-    // Process bags and embed ImageAssets
-    for (const columnName of [
-      'firstColumn',
-      'secondColumn',
-      'thirdColumn',
-    ] as const) {
-      const column = previewStoryline.bags[columnName];
-
-      for (const bag of column) {
-        const publishedBag: any = {
-          id: bag.id,
-        };
-
-        if (bag.imageAsset) {
-          const embeddedAsset = await createEmbeddedImageAsset(
-            bag.imageAsset.toString()
-          );
-          if (embeddedAsset) {
-            publishedBag.embeddedImageAsset = embeddedAsset;
-          }
-        }
-
-        // Keep legacy fields for backward compatibility
-        if (bag.imageUrl) publishedBag.imageUrl = bag.imageUrl;
-        if (bag.videoUrl) publishedBag.videoUrl = bag.videoUrl;
-        if (bag.imageFrameUrls)
-          publishedBag.imageFrameUrls = bag.imageFrameUrls;
-
-        publishedData.bags[columnName].push(publishedBag);
-      }
-    }
-
-    // Process stories and embed AudioAssets
-    for (const story of previewStoryline.stories) {
-      const publishedStory: any = {
-        id: story.id,
-        selectedBags: story.selectedBags,
-        events: story.events,
-      };
-
-      if (story.audioAsset) {
-        const embeddedAsset = await createEmbeddedAudioAsset(
-          story.audioAsset.toString()
-        );
-        if (embeddedAsset) {
-          publishedStory.embeddedAudioAsset = embeddedAsset;
-        }
-      }
-
-      // Keep legacy field
-      if (story.audioSrc) publishedStory.audioSrc = story.audioSrc;
-
-      publishedData.stories.push(publishedStory);
-    }
-
-    // Create the published storyline
-    const publishedStoryline = new Storyline(publishedData);
-    await publishedStoryline.save();
-
-    res.json({
-      success: true,
-      message: 'Storyline published successfully',
-      data: {
-        preview: previewStoryline,
-        published: publishedStoryline,
-      },
-    });
-  } catch (error) {
-    console.error('Error publishing storyline:', error);
-    res.status(500).json({ message: 'Failed to publish storyline', error });
-  }
-};
-
-export async function publishStorylines(req: Request, res: Response) {
-  return res.status(HTTP_STATUS.NOT_IMPLEMENTED).json({
-    message: 'This endpoint is not implemented yet',
-  } as ErrorResponse);
-
-  /*
-  try {
-    const previewData = await Storyline.find({
-      status: 'preview',
-    });
-
-    if (!previewData || previewData.length === 0) {
-      return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: 'No preview data found',
-      } as ErrorResponse);
-    }
-
-    const publishedStorylines = [];
-
-    for (const preview of previewData) {
-      const currentPublished = await Storyline.findOne({
-        title: preview.title,
-        status: 'published',
-      });
-
-      if (currentPublished) {
-        currentPublished.bags = preview.bags;
-        currentPublished.stories = preview.stories;
-        await currentPublished.save();
-        publishedStorylines.push(currentPublished);
-      } else {
-        const newPublished = await Storyline.create({
-          title: preview.title,
-          bags: preview.bags,
-          stories: preview.stories,
-          status: 'published',
-        });
-        publishedStorylines.push(newPublished);
-      }
-    }
-
-    res.status(HTTP_STATUS.OK).json(publishedStorylines);
-  } catch (error) {
-    console.error('Error publishing storylines:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      message: 'Failed to publish storylines',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorResponse);
-  }
-  */
-}
-
 export async function createStoryline(req: Request, res: Response) {
   try {
     const { title, collectionId, bags, stories }: CreateStorylineDto = req.body;
@@ -570,8 +398,6 @@ export async function updateStoryline(req: Request, res: Response) {
         _id: { $ne: id },
         collections: { $in: existingStoryline.collections },
       });
-
-      console.log('titleConflict', titleConflict);
 
       if (titleConflict) {
         return res.status(HTTP_STATUS.CONFLICT).json({

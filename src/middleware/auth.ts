@@ -16,6 +16,7 @@ export const authenticateToken = (
     { method: 'GET', route: '/api/collections/:id' },
     { method: 'GET', route: '/api/storylines' },
     { method: 'GET', route: '/api/info' },
+    { method: 'GET', route: '/api/settings/public' },
   ];
 
   // Check if the request is to a public route

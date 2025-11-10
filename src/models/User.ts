@@ -31,7 +31,7 @@ const UserSchema: Schema = new Schema(
     },
     roles: {
       type: [String],
-      enum: ['member', 'admin'],
+      enum: ['member', 'admin', 'superadmin'],
       default: ['member'],
     },
     lastLoggedIn: { type: Date },

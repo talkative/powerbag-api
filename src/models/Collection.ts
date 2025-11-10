@@ -4,6 +4,8 @@ export interface ICollection extends Document {
   name: string;
   description?: string;
   status: 'preview' | 'published';
+  publishedDate?: Date;
+  previewVersionId?: mongoose.Types.ObjectId;
   createDate: Date;
   updateDate: Date;
 }
@@ -28,6 +30,10 @@ const CollectionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Collection',
     },
+    publishedDate: {
+      type: Date,
+      default: null, // Only set when the preview collection gets published
+    },
   },
   {
     timestamps: {
@@ -37,7 +43,9 @@ const CollectionSchema = new mongoose.Schema(
   }
 );
 
-CollectionSchema.index({ name: 1, status: 1 }, { unique: true });
+CollectionSchema.index({ status: 1 });
+CollectionSchema.index({ previewVersionId: 1 });
+CollectionSchema.index({ name: 1 });
 
 export const Collection = mongoose.model<ICollection>(
   'Collection',

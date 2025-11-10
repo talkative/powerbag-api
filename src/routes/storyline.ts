@@ -6,8 +6,6 @@ import {
   updateStoryline,
   deleteStoryline,
   checkIfUpdateAvailable,
-  publishStoryline,
-  publishStorylines,
   migrateStoryline,
   resolveLocationNames,
 } from '../handlers/storyline';
@@ -26,8 +24,5 @@ router.put('/:id', updateStoryline);
 router.get('/system/updates', checkIfUpdateAvailable);
 
 router.delete('/:id', deleteStoryline);
-
-router.post('/:title/publish', publishStoryline);
-router.post('/publish/all', publishStorylines);
 
 export default router;

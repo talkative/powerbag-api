@@ -7,16 +7,18 @@ A RESTful API built with Node.js, Express, TypeScript, and MongoDB for managing 
 - **TypeScript**: Full type safety and modern JavaScript features
 - **MongoDB Integration**: Robust data persistence with Mongoose ODM
 - **JWT Authentication**: Secure user authentication and authorization
-- **Role-based Access Control**: User roles with member/admin permissions
+- **Role-based Access Control**: Multi-tier user roles (member/admin/superadmin) with collection-based access
 - **Email Integration**: Mandrill email service integration
-- **Asset Management**: Complete file upload system with S3 integration for images, videos, and audio
+- **Asset Management**: Complete file upload system with S3 integration, duplicate detection, and automatic location tracking
+- **Settings System**: Centralized configuration management with public/private settings and categorization
 - **Modular Architecture**: Clean separation of concerns with handlers, routes, and models
 - **HTTP Status Constants**: Centralized HTTP status code management
 - **Input Validation**: Comprehensive data validation and sanitization
 - **Error Handling**: Structured error responses and graceful shutdown
 - **Environment Configuration**: Flexible configuration management
-- **Preview/Published Workflow**: Dual-state content management system
-- **Collection System**: Organize storylines into collections with unidirectional relationships
+- **Preview/Published Workflow**: Unified content management with automatic publishing and version comparison
+- **Collection System**: Organize storylines into collections with content activity tracking
+- **Migration Support**: Built-in data migration and location resolution tools
 
 ## Tech Stack
 
@@ -42,34 +44,38 @@ src/
 │   └── httpStatusCodes.ts           # HTTP status code constants
 ├── dtos/
 │   ├── CreateAsset.dto.ts           # Asset data transfer objects
+│   ├── CreateStoryline.dto.ts       # Storyline data transfer objects
 │   └── CreateUser.dto.ts            # User data transfer objects
 ├── handlers/
-│   ├── assets.ts                    # Asset upload and management handlers
-│   ├── collections.ts               # Collection handlers/controllers
+│   ├── assets.ts                    # Asset upload and management with duplicate detection
+│   ├── collections.ts               # Collection handlers with version comparison
 │   ├── events.ts                    # Event handlers/controllers
 │   ├── info.ts                      # Info content handlers
-│   ├── storyline.ts                 # Storyline handlers
-│   └── users.ts                     # User handlers with auth
+│   ├── settings.ts                  # Settings management handlers
+│   ├── storyline.ts                 # Storyline handlers with unified workflow
+│   └── users.ts                     # User handlers with role-based access control
 ├── middleware/
 │   └── auth.ts                      # JWT authentication middleware
 ├── models/
-│   ├── Collection.ts                # Collection model for organizing storylines
+│   ├── Collection.ts                # Collection model with publishing workflow
 │   ├── Events.ts                    # Event data model and schema
 │   ├── Info.ts                      # Info content model
-│   ├── Storyline.ts                 # Storyline model with embedded bags
-│   ├── User.ts                      # User model with roles and authentication
+│   ├── Settings.ts                  # Centralized settings model with categories
+│   ├── Storyline.ts                 # Unified storyline model with asset references
+│   ├── User.ts                      # User model with collection access control
 │   └── Asset/
-│       ├── BaseAsset.ts             # Base asset model with common properties
+│       ├── BaseAsset.ts             # Base asset model with location tracking
 │       ├── ImageAsset.ts            # Image-specific asset model
 │       ├── VideoAsset.ts            # Video-specific asset model
 │       ├── AudioAsset.ts            # Audio-specific asset model
 │       └── index.ts                 # Asset model exports
 ├── routes/
 │   ├── assets.ts                    # Asset API endpoints
-│   ├── collection.ts                # Collection API endpoints
+│   ├── collection.ts                # Collection API endpoints with comparison
 │   ├── events.ts                    # Event API endpoints
 │   ├── info.ts                      # Info content endpoints
-│   ├── storyline.ts                 # Storyline API endpoints
+│   ├── settings.ts                  # Settings management endpoints
+│   ├── storyline.ts                 # Storyline API endpoints with migration
 │   └── users.ts                     # User API endpoints with auth
 ├── types/
 │   ├── nodemailer-mandrill-transport.d.ts  # Type declarations for email
@@ -153,17 +159,27 @@ Authorization: Bearer <your_jwt_token>
 
 ### User Roles
 
-- **member**: Default role for new users
-- **admin**: Administrative privileges
+- **member**: Default role with access to assigned collections
+- **admin**: Administrative privileges with full system access
+- **superadmin**: Highest level administrative privileges with unrestricted access
+
+### Collection Access Control
+
+- **Members**: Can only access collections assigned to them via `assignedCollectionIds`
+- **Admins**: Have access to all collections regardless of assignment
+- **Superadmins**: Have unrestricted access to all collections and system-wide privileges
+- **Dynamic Access**: User access is validated on each request using collection-specific methods
 
 ## Content Management System
 
-The API features a **preview/published workflow** for content management:
+The API features a **unified preview/published workflow** for content management:
 
 - **Preview**: Draft content for editing and testing
 - **Published**: Live content served to end users
-- **Publishing**: Simple copy operation from preview to published state
-- **Independent Publishing**: Each content type can be published separately
+- **Unified Publishing**: Collections and storylines published together automatically
+- **Version Comparison**: Compare preview vs published versions to determine if publishing is needed
+- **Activity Tracking**: Track content updates and last modified dates
+- **Settings Management**: Centralized configuration system with categorization
 
 ## API Endpoints
 
@@ -184,19 +200,18 @@ User account management and authentication:
 
 ### Storylines (`/api/storylines`)
 
-Complete storyline management with preview/published workflow:
+Complete storyline management with unified preview/published workflow:
 
-| Method   | Endpoint                     | Auth Required | Description                                  |
-| -------- | ---------------------------- | ------------- | -------------------------------------------- |
-| `GET`    | `/storylines`                | No            | Get all storylines with optional filtering   |
-| `GET`    | `/storylines/:id`            | No            | Get specific storyline by id                 |
-| `POST`   | `/storylines`                | Yes           | Create new storyline (requires collectionId) |
-| `PUT`    | `/storylines/:id`            | Yes           | Update existing storyline                    |
-| `DELETE` | `/storylines/:id`            | Yes           | Delete specific storyline by ID              |
-| `DELETE` | `/storylines`                | Yes           | Delete all storylines                        |
-| `GET`    | `/storylines/system/updates` | No            | Check if updates are available               |
-| `POST`   | `/storylines/:title/publish` | Yes           | Publish specific storyline                   |
-| `POST`   | `/storylines/publish/all`    | Yes           | Publish all storylines                       |
+| Method   | Endpoint                        | Auth Required | Description                                  |
+| -------- | ------------------------------- | ------------- | -------------------------------------------- |
+| `GET`    | `/storylines`                   | No            | Get all storylines with optional filtering   |
+| `GET`    | `/storylines/:id`               | No            | Get specific storyline by id                 |
+| `POST`   | `/storylines`                   | Yes           | Create new storyline (requires collectionId) |
+| `PUT`    | `/storylines/:id`               | Yes           | Update existing storyline                    |
+| `DELETE` | `/storylines/:id`               | Yes           | Delete specific storyline by ID              |
+| `POST`   | `/storylines/resolve-locations` | Yes           | Resolve location information for storylines  |
+| `POST`   | `/storylines/migrate/:id`       | Yes           | Migrate storyline to new format              |
+| `GET`    | `/storylines/system/updates`    | No            | Check if updates are available               |
 
 **Query Parameters:**
 
@@ -205,28 +220,31 @@ Complete storyline management with preview/published workflow:
 
 ### Collections (`/api/collections`)
 
-Collection management for organizing storylines:
+Collection management for organizing storylines with version comparison:
 
-| Method   | Endpoint                                             | Auth Required | Description                      |
-| -------- | ---------------------------------------------------- | ------------- | -------------------------------- |
-| `GET`    | `/collections`                                       | No            | Get all collections              |
-| `GET`    | `/collections/:id`                                   | No            | Get specific collection by ID    |
-| `POST`   | `/collections`                                       | Yes           | Create new collection            |
-| `PUT`    | `/collections/:id`                                   | Yes           | Update existing collection       |
-| `DELETE` | `/collections/:id`                                   | Yes           | Delete collection                |
-| `POST`   | `/collections/:collectionId/storylines/:storylineId` | Yes           | Add storyline to collection      |
-| `DELETE` | `/collections/:collectionId/storylines/:storylineId` | Yes           | Remove storyline from collection |
-| `POST`   | `/collections/:id/publish`                           | Yes           | Publish specific collection      |
-| `POST`   | `/collections/publish/all`                           | Yes           | Publish all collections          |
+| Method   | Endpoint                                             | Auth Required | Description                           |
+| -------- | ---------------------------------------------------- | ------------- | ------------------------------------- |
+| `GET`    | `/collections`                                       | No            | Get all collections                   |
+| `GET`    | `/collections/:id`                                   | No            | Get specific collection by ID         |
+| `POST`   | `/collections`                                       | Yes           | Create new collection                 |
+| `PUT`    | `/collections/:id`                                   | Yes           | Update existing collection            |
+| `DELETE` | `/collections/:id`                                   | Yes           | Delete collection                     |
+| `POST`   | `/collections/:collectionId/storylines/:storylineId` | Yes           | Add storyline to collection           |
+| `DELETE` | `/collections/:collectionId/storylines/:storylineId` | Yes           | Remove storyline from collection      |
+| `POST`   | `/collections/:id/publish`                           | Yes           | Publish collection and storylines     |
+| `POST`   | `/collections/publish/all`                           | Yes           | Publish all collections               |
+| `GET`    | `/collections/:id/compare`                           | Yes           | Compare preview vs published versions |
+| `GET`    | `/collections/:id/publish-status`                    | Yes           | Check if collection needs publishing  |
 
 **Query Parameters:**
 
 - `status` - Filter by status (`preview` or `published`)
 - `includeStorylines` - Include storylines in collection response (`true` or `false`)
+- `includeLastUpdatedContent` - Include latest storyline update timestamp (`true` or `false`)
 
 ### Assets (`/api/assets`)
 
-Complete asset management system with S3 integration:
+Complete asset management system with S3 integration and duplicate detection:
 
 | Method   | Endpoint                        | Auth Required | Description                          |
 | -------- | ------------------------------- | ------------- | ------------------------------------ |
@@ -239,6 +257,12 @@ Complete asset management system with S3 integration:
 | `GET`    | `/assets/:type`                 | No            | Get assets by type with filtering    |
 | `GET`    | `/assets/detail/:id`            | No            | Get specific asset by ID             |
 | `DELETE` | `/assets/:id`                   | Yes           | Delete asset (S3 and database)       |
+
+**Enhanced Features:**
+
+- **Duplicate Detection**: Automatic detection and prevention of duplicate uploads
+- **Filename Sanitization**: Automatic sanitization of special characters in filenames
+- **Location Tracking**: Automatic tracking of asset usage in storylines and collections
 
 **Supported File Types:**
 
@@ -274,32 +298,71 @@ Multi-language information content management:
 | `POST` | `/info`     | Yes           | Create new info content      |
 | `PUT`  | `/info/:id` | Yes           | Update existing info content |
 
+### Settings (`/api/settings`)
+
+Centralized settings management with categorization:
+
+| Method   | Endpoint                       | Auth Required | Description              |
+| -------- | ------------------------------ | ------------- | ------------------------ |
+| `GET`    | `/settings`                    | Yes (Admin)   | Get all settings         |
+| `GET`    | `/settings/public`             | No            | Get public settings      |
+| `GET`    | `/settings/category/:category` | Yes           | Get settings by category |
+| `POST`   | `/settings`                    | Yes (Admin)   | Create or update setting |
+| `PUT`    | `/settings/:id`                | Yes (Admin)   | Update specific setting  |
+| `DELETE` | `/settings/:id`                | Yes (Admin)   | Delete setting           |
+
+**Settings Features:**
+
+- **Categorization**: Organize settings by category (website, email, etc.)
+- **Public/Private**: Control which settings are accessible to frontend
+- **Type Safety**: Strongly typed values (string, number, boolean, object, array, objectId)
+- **Default Values**: Automatic initialization of default system settings
+
 ## Data Models
 
 ### User
 
 - `name` (string): User's full name (optional, max 50 characters)
 - `email` (string, required, unique): User's email address with validation
-- `roles` (array): User roles (`['member']` by default, can include `'admin'`)
+- `roles` (array): User roles (`['member']` by default, can include `'admin'` and `'superadmin'`)
+- `assignedCollectionIds` (array): Collection IDs the user has access to (for members)
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+**Access Control Methods:**
+
+- `hasAccessToCollection(collectionId)`: Check if user can access specific collection
+- `getAccessibleCollectionIds()`: Get list of collections user can access
 
 ### Storyline
 
 - `title` (string, required): Storyline title
+- `subtitle` (string): Optional storyline subtitle
+- `description` (string): Optional storyline description
 - `status` (enum): `'preview'` or `'published'`
-- `bags` (object): Three columns of embedded bag objects with images/videos
-- `stories` (array): Story events with audio, timing, and bag selections
+- `bags` (object): Three columns of bag objects with asset references
+- `stories` (array): Story events with audio, timing, and asset references
 - `collections` (array): References to collections this storyline belongs to
+- `previewVersionId` (ObjectId): Reference to preview version (for published storylines)
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
 
 ### Collection
 
-- `name` (string, required, unique): Collection name
+- `name` (string, required): Collection name
 - `description` (string): Optional collection description
 - `status` (enum): `'preview'` or `'published'`
+- `previewVersionId` (ObjectId): Reference to preview version (for published collections)
+- `publishedDate` (Date): When the preview collection was last published
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
 
-**Note**: Collections use a unidirectional relationship - storylines reference collections, not vice versa.
+### Settings
+
+- `key` (string, required, unique): Setting identifier
+- `value` (any, required): Setting value (typed based on type field)
+- `type` (enum): `'string' | 'number' | 'boolean' | 'object' | 'array' | 'objectId'`
+- `description` (string): Optional description of the setting
+- `category` (string): Category for grouping (default: 'general')
+- `isPublic` (boolean): Whether setting is accessible to frontend (default: false)
+- `createDate` / `updateDate` (Date): Auto-generated timestamps
 
 ### Events
 
@@ -319,6 +382,19 @@ Multi-language information content management:
 - **Type**: Many-to-Many (unidirectional)
 - **Implementation**: Storylines store collection IDs in `collections` array
 - **Benefits**: Simple relationship management, no data synchronization issues
+
+### User ↔ Collection Access Control
+
+- **Type**: Many-to-Many via `assignedCollectionIds`
+- **Admin Access**: Admins have access to all collections
+- **Member Access**: Members only access assigned collections
+- **Dynamic Validation**: Access checked on each request
+
+### Asset Location Tracking
+
+- **Automatic Tracking**: Assets track their usage in storylines via `location` field
+- **Format**: `{collectionIds}:{storylineId}` for easy parsing
+- **Updates**: Location updated automatically when storylines change collections
 
 ## Example Requests
 
@@ -392,18 +468,53 @@ Content-Type: application/json
 # Add storyline to collection
 POST /api/collections/{collection_id}/storylines/{storyline_id}
 Authorization: Bearer <your_jwt_token>
+
+# Check if collection needs publishing
+GET /api/collections/{collection_id}/publish-status
+
+# Compare preview vs published versions
+GET /api/collections/{collection_id}/compare
 ```
 
 ### Publishing Workflow
 
 ```bash
-# Publish individual items
-POST /api/storylines/adventure-story/publish
-POST /api/collections/collection-id/publish
+# Check if collection needs publishing
+GET /api/collections/{collection_id}/publish-status
 
-# Publish all at once
-POST /api/storylines/publish/all
+# Compare versions before publishing
+GET /api/collections/{collection_id}/compare
+
+# Publish collection and all its storylines
+POST /api/collections/{collection_id}/publish
+
+# Publish all collections
 POST /api/collections/publish/all
+```
+
+### Settings Management
+
+```bash
+# Get public settings (for frontend)
+GET /api/settings/public
+
+# Get all settings (admin only)
+GET /api/settings
+Authorization: Bearer <admin_jwt_token>
+
+# Create/update setting
+POST /api/settings
+Authorization: Bearer <admin_jwt_token>
+Content-Type: application/json
+
+{
+  "key": "defaultCollection",
+  "value": "64f123...",
+  "type": "objectId",
+  "description": "Default collection for the website",
+  "category": "website",
+  "isPublic": true
+}
 ```
 
 ## HTTP Status Codes
@@ -489,25 +600,32 @@ Protected routes use JWT middleware that:
 
 ## Publishing Workflow
 
-The content management system supports a comprehensive preview/published workflow:
+The content management system supports a comprehensive unified preview/published workflow:
 
 ### Content States
 
 - **Preview**: Draft content for editing and testing
 - **Published**: Live content served to end users
 
-### Publishing Process
+### Unified Publishing Process
 
 1. **Create/Edit in Preview**: All content starts as preview
 2. **Test and Validate**: Use preview endpoints for testing
-3. **Publish**: Copy preview content to published state
-4. **Go Live**: Published content is served to end users
+3. **Compare Versions**: Check what has changed since last publish
+4. **Publish Collection**: Automatically publishes collection and all storylines together
+5. **Track Publishing**: Preview collections marked with `publishedDate`
 
-### Independent Publishing
+### Version Comparison Features
 
-- **Storylines**: Publish storylines (which reference bags)
-- **Collections**: Publish collections (which reference storylines)
-- **Batch Operations**: Publish all content of a type at once
+- **Detailed Comparison**: See exactly what has changed between versions
+- **Publishing Recommendations**: Automatic detection of whether publishing is needed
+- **Content Activity**: Track when storylines within collections were last modified
+
+### Publishing Benefits
+
+- **Unified Workflow**: Collections and storylines published together for consistency
+- **Version Control**: Clear tracking of preview vs published content
+- **Activity Tracking**: Easy identification of collections needing attention
 
 ## Development Scripts
 
@@ -538,10 +656,12 @@ The project uses strict TypeScript settings with comprehensive type safety:
 
 ### Data Architecture
 
-- **Embedded Design**: Bags are embedded within storylines as structured objects
+- **Unified Design**: Preview and published content use same structure with asset references
 - **Unidirectional Relationships**: Storylines reference collections (not bidirectional)
 - **Status Management**: Each content type has independent preview/published states
 - **Reference Integrity**: Automatic cleanup when collections are deleted
+- **Asset Tracking**: Automatic location tracking for assets in storylines
+- **Settings System**: Centralized configuration with flexible key-value storage
 
 ### Type Safety
 
@@ -553,9 +673,12 @@ The project uses strict TypeScript settings with comprehensive type safety:
 ## Performance Considerations
 
 - **Efficient Queries**: Compound indexes for status + identifier lookups
-- **Embedded Objects**: Bags stored within storylines for fast access
-- **Reference Optimization**: Store collection IDs for flexible relationships
+- **Asset References**: Storylines reference assets for flexible relationships
+- **Collection Indexes**: Optimized for status, name, and publishing lookups
 - **Batch Operations**: Support for publishing multiple items at once
+- **Settings Caching**: Efficient settings retrieval with categorization
+- **Location Tracking**: Automatic asset location updates via Mongoose hooks
+- **Duplicate Prevention**: Intelligent duplicate detection to prevent redundant uploads
 
 ## Contributing
 

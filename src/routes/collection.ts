@@ -8,6 +8,8 @@ import {
   addStorylineToCollection,
   removeStorylineFromCollection,
   publishCollection,
+  checkPublishingStatus,
+  compareCollectionVersions,
 } from '../handlers/collections';
 
 const router = Router();
@@ -15,6 +17,9 @@ const router = Router();
 // Public routes
 router.get('/', getCollections);
 router.get('/:id', getCollection);
+
+router.get('/:id/compare', compareCollectionVersions);
+router.get('/:id/publish-status', checkPublishingStatus);
 
 // Protected routes (require authentication)
 router.post('/', createCollection);

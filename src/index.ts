@@ -11,6 +11,7 @@ import infoRoute from './routes/info';
 import eventsRoute from './routes/events';
 import collectionRoute from './routes/collection';
 import assetsRoute from './routes/assets';
+import settingsRoute from './routes/settings';
 
 import { connectDB, disconnectDB } from './config/database';
 
@@ -31,6 +32,7 @@ app.use('/api/info', infoRoute);
 app.use('/api/events', eventsRoute);
 app.use('/api/collections', collectionRoute);
 app.use('/api/assets', assetsRoute);
+app.use('/api/settings', settingsRoute);
 
 const PORT = process.env.PORT || 3000;
 

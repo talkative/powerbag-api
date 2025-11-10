@@ -725,7 +725,10 @@ export const deleteAsset = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Check if user owns the asset or has admin privileges
-    if (asset.uploadedBy.toString() !== userId) {
+    if (
+      asset.uploadedBy.toString() !== userId &&
+      !req.user?.roles.includes('superadmin')
+    ) {
       return res.status(HTTP_STATUS.FORBIDDEN).json({
         success: false,
         message: 'You can only delete your own assets',
