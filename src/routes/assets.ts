@@ -6,6 +6,7 @@ import {
   uploadMultipleAudioAssets,
   getAssetsByType,
   getAssetById,
+  updateAsset,
   deleteAsset,
   deleteAllAssets,
 } from '../handlers/assets';
@@ -24,6 +25,8 @@ router.post(
   upload.array('files', 10),
   uploadMultipleAudioAssets
 );
+
+router.patch('/:type/:id', updateAsset);
 
 // Get routes
 router.get('/:type', getAssetsByType); // Get assets by type (image/video/audio)

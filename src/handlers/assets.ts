@@ -219,7 +219,8 @@ export const uploadMultipleImageAssets = async (
         const location: string[] = [];
 
         const imageAsset = new ImageAsset({
-          filename: s3Key,
+          key: s3Key,
+          filename: originalName,
           originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
@@ -360,7 +361,8 @@ export const uploadMultipleVideoAssets = async (
         const location: string[] = [];
 
         const videoAsset = new VideoAsset({
-          filename: s3Key,
+          key: s3Key,
+          filename: originalName,
           originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
@@ -494,7 +496,8 @@ export const uploadMultipleAudioAssets = async (
         const location: string[] = [];
 
         const audioAsset = new AudioAsset({
-          filename: s3Key,
+          key: s3Key,
+          filename: originalName,
           originalName: originalName,
           mimeType: file.mimetype,
           size: file.size,
@@ -678,6 +681,140 @@ export const getAssetById = async (req: Request, res: Response) => {
   }
 };
 
+export const updateAsset = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { type, id } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+    }
+
+    // Validate asset type
+    if (!type || !['image', 'video', 'audio'].includes(type)) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: 'Invalid asset type. Must be image, video, or audio',
+      });
+    }
+
+    // Get the correct asset model based on type
+    let AssetModel: any;
+    let updatableFields: string[];
+
+    switch (type) {
+      case 'image':
+        AssetModel = ImageAsset;
+        updatableFields = ['filename'];
+        break;
+      case 'video':
+        AssetModel = VideoAsset;
+        updatableFields = ['filename'];
+        break;
+      case 'audio':
+        AssetModel = AudioAsset;
+        updatableFields = ['filename'];
+        break;
+      default:
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid asset type',
+        });
+    }
+
+    // Find the asset
+    const asset = await AssetModel.findById(id);
+
+    if (!asset) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        success: false,
+        message: `${
+          type.charAt(0).toUpperCase() + type.slice(1)
+        } asset not found`,
+      });
+    }
+
+    // Check if user owns the asset or has admin privileges
+    if (
+      asset.uploadedBy.toString() !== userId &&
+      !req.user?.roles.includes('admin') &&
+      !req.user?.roles.includes('superadmin')
+    ) {
+      return res.status(HTTP_STATUS.FORBIDDEN).json({
+        success: false,
+        message: 'You can only update your own assets',
+      });
+    }
+
+    // Extract only the allowed fields from request body
+    const updateData: any = {};
+
+    for (const field of updatableFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
+    // If no valid fields provided
+    if (Object.keys(updateData).length === 0) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: `No valid fields provided for ${type} asset update`,
+        allowedFields: updatableFields,
+      });
+    }
+
+    // Special validation for filename if provided
+    if (updateData.filename) {
+      // Check if filename already exists for this user (excluding current asset)
+      const existingAsset = await AssetModel.findOne({
+        _id: { $ne: id },
+        filename: updateData.filename,
+        uploadedBy: userId,
+      });
+
+      if (existingAsset) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          success: false,
+          message: 'An asset with this filename already exists',
+          data: {
+            existingAssetId: existingAsset._id,
+            existingAssetUrl: existingAsset.url,
+          },
+        });
+      }
+    }
+
+    // Update the asset
+    const updatedAsset = await AssetModel.findByIdAndUpdate(id, updateData, {
+      new: true, // Return the updated document
+      runValidators: true, // Run schema validators
+    }).populate('uploadedBy', 'email name');
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: `${
+        type.charAt(0).toUpperCase() + type.slice(1)
+      } asset updated successfully`,
+      data: {
+        ...updatedAsset.toObject(),
+        type: type,
+        updatedFields: Object.keys(updateData),
+      },
+    });
+  } catch (error) {
+    console.error('Error updating asset:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to update asset',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
 // Delete asset - now deletes from S3 as well and supports all asset types
 export const deleteAsset = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -736,7 +873,7 @@ export const deleteAsset = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Delete from S3
-    await s3Service.deleteFile(asset.filename);
+    await s3Service.deleteFile(asset.key);
 
     // Delete from database using the correct model
     if (assetType === 'image') {

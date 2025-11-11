@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IBaseAsset extends Document<mongoose.Types.ObjectId> {
+  key: string; // Unique storage key for the asset
   filename: string;
   originalName: string;
   mimeType: string;
@@ -23,6 +24,11 @@ const BaseAssetSchema: Schema = new Schema(
       type: String,
       required: [true, 'Original name is required'],
       trim: true,
+    },
+    key: {
+      type: String,
+      required: [true, 'Storage key is required'],
+      unique: true,
     },
     mimeType: {
       type: String,
