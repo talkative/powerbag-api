@@ -10,6 +10,7 @@ import {
   publishCollection,
   checkPublishingStatus,
   compareCollectionVersions,
+  duplicateCollection,
 } from '../handlers/collections';
 
 const router = Router();
@@ -25,6 +26,7 @@ router.get('/:id/publish-status', checkPublishingStatus);
 router.post('/', createCollection);
 router.put('/:id', updateCollection);
 router.delete('/:id', deleteCollection);
+router.post('/:id/duplicate', duplicateCollection);
 
 // Relationship management routes
 router.post('/:collectionId/storylines/:storylineId', addStorylineToCollection);

@@ -227,6 +227,100 @@ export async function deleteCollection(req: Request, res: Response) {
   }
 }
 
+export async function duplicateCollection(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { includeStorylines = 'true' } = req.query;
+
+    // Find the original collection to duplicate
+    const originalCollection = await Collection.findOne({
+      _id: id,
+      status: 'preview', // Only duplicate preview collections
+    });
+
+    if (!originalCollection) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: 'Preview collection not found',
+      } as ErrorResponse);
+    }
+
+    // Generate a unique name for the duplicate
+    const duplicateName = await generateUniqueDuplicateName(
+      originalCollection.name
+    );
+
+    // Create the duplicate collection
+    const duplicateCollection = new Collection({
+      name: duplicateName,
+      description: originalCollection.description,
+      status: 'preview',
+    });
+
+    const savedDuplicateCollection = await duplicateCollection.save();
+    const duplicatedStorylines = [];
+
+    // Optionally duplicate storylines as well
+    if (includeStorylines === 'true') {
+      // Get all storylines from the original collection
+      const originalStorylines = await Storyline.find({
+        collections: { $in: [id] },
+        status: 'preview',
+      });
+
+      // Duplicate each storyline and add to the new collection
+      for (const originalStoryline of originalStorylines) {
+        const duplicateStoryline = new Storyline({
+          title: originalStoryline.title, // Keep the same title
+          bags: originalStoryline.bags, // Deep copy of bags data
+          stories: originalStoryline.stories, // Deep copy of stories data
+          collections: [savedDuplicateCollection._id], // Assign to new collection
+          status: 'preview',
+        });
+
+        const savedStoryline = await duplicateStoryline.save();
+        duplicatedStorylines.push(savedStoryline);
+      }
+    }
+
+    res.status(HTTP_STATUS.CREATED).json({
+      message: 'Collection duplicated successfully',
+      data: {
+        originalCollection: {
+          _id: originalCollection._id,
+          name: originalCollection.name,
+        },
+        duplicatedCollection: savedDuplicateCollection,
+        duplicatedStorylines: {
+          count: duplicatedStorylines.length,
+          storylines: duplicatedStorylines,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error duplicating collection:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to duplicate collection',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+}
+
+// Helper function to generate unique duplicate name for collections
+async function generateUniqueDuplicateName(
+  originalName: string
+): Promise<string> {
+  let counter = 1;
+  let duplicateName = `${originalName} (${counter})`;
+
+  // Keep incrementing until we find a name that doesn't exist
+  while (await Collection.findOne({ name: duplicateName, status: 'preview' })) {
+    counter++;
+    duplicateName = `${originalName} (${counter})`;
+  }
+
+  return duplicateName;
+}
+
 export async function addStorylineToCollection(req: Request, res: Response) {
   try {
     const { collectionId, storylineId } = req.params;

@@ -233,6 +233,7 @@ Collection management for organizing storylines with version comparison:
 | `DELETE` | `/collections/:collectionId/storylines/:storylineId` | Yes           | Remove storyline from collection      |
 | `POST`   | `/collections/:id/publish`                           | Yes           | Publish collection and storylines     |
 | `POST`   | `/collections/publish/all`                           | Yes           | Publish all collections               |
+| `POST`   | `/collections/:id/duplicate`                         | Yes           | Duplicate collection with auto-naming |
 | `GET`    | `/collections/:id/compare`                           | Yes           | Compare preview vs published versions |
 | `GET`    | `/collections/:id/publish-status`                    | Yes           | Check if collection needs publishing  |
 
@@ -256,6 +257,10 @@ Complete asset management system with S3 integration and duplicate detection:
 | `POST`   | `/assets/audio/upload/multiple` | Yes           | Upload multiple audio files (max 10) |
 | `GET`    | `/assets/:type`                 | No            | Get assets by type with filtering    |
 | `GET`    | `/assets/detail/:id`            | No            | Get specific asset by ID             |
+| `PATCH`  | `/assets/:type/:id`             | Yes           | Update specific asset fields         |
+| `PATCH`  | `/assets`                       | Yes           | Bulk update multiple assets          |
+| `GET`    | `/assets/migrate/preview`       | Yes (Admin)   | Preview asset field migration        |
+| `POST`   | `/assets/migrate`               | Yes (Admin)   | Run asset field migration            |
 | `DELETE` | `/assets/:id`                   | Yes           | Delete asset (S3 and database)       |
 
 **Enhanced Features:**
@@ -263,6 +268,9 @@ Complete asset management system with S3 integration and duplicate detection:
 - **Duplicate Detection**: Automatic detection and prevention of duplicate uploads
 - **Filename Sanitization**: Automatic sanitization of special characters in filenames
 - **Location Tracking**: Automatic tracking of asset usage in storylines and collections
+- **Partial Updates**: Update specific asset fields without replacing entire asset
+- **Bulk Operations**: Update multiple assets in a single request
+- **Migration Tools**: Built-in migration system for updating asset field structure
 
 **Supported File Types:**
 
@@ -347,12 +355,17 @@ Centralized settings management with categorization:
 
 ### Collection
 
-- `name` (string, required): Collection name
+- `name` (string, required): Collection name (auto-incremented for duplicates)
 - `description` (string): Optional collection description
 - `status` (enum): `'preview'` or `'published'`
 - `previewVersionId` (ObjectId): Reference to preview version (for published collections)
 - `publishedDate` (Date): When the preview collection was last published
 - `createDate` / `updateDate` (Date): Auto-generated timestamps
+
+**Duplication Features:**
+
+- Automatic name incrementing: "Collection" → "Collection (1)" → "Collection (2)"
+- Optional storyline duplication with preserved titles
 
 ### Settings
 
@@ -474,6 +487,54 @@ GET /api/collections/{collection_id}/publish-status
 
 # Compare preview vs published versions
 GET /api/collections/{collection_id}/compare
+
+# Duplicate collection with storylines
+POST /api/collections/{collection_id}/duplicate?includeStorylines=true
+```
+
+### Asset Management
+
+```bash
+# Update asset fields
+PATCH /api/assets/image/64f123...
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "filename": "updated_beach_photo.jpg",
+  "altText": "Beautiful sunset at the beach",
+  "description": "Updated description for the photo"
+}
+
+# Bulk update multiple assets
+PATCH /api/assets
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "updates": [
+    {
+      "id": "64f123...",
+      "type": "image",
+      "filename": "new_image_name.jpg",
+      "altText": "Updated alt text"
+    },
+    {
+      "id": "64f456...",
+      "type": "video",
+      "description": "Updated video description",
+      "duration": 1500
+    }
+  ]
+}
+
+# Preview asset migration
+GET /api/assets/migrate/preview
+Authorization: Bearer <admin_jwt_token>
+
+# Run asset migration
+POST /api/assets/migrate
+Authorization: Bearer <admin_jwt_token>
 ```
 
 ### Publishing Workflow
