@@ -26,6 +26,11 @@ const CollectionSchema = new mongoose.Schema(
       enum: ['preview', 'published'],
       default: 'preview',
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     previewVersionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Collection',

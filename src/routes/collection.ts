@@ -11,6 +11,7 @@ import {
   checkPublishingStatus,
   compareCollectionVersions,
   duplicateCollection,
+  migrateCollectionsCreatedBy,
 } from '../handlers/collections';
 
 const router = Router();
@@ -21,6 +22,8 @@ router.get('/:id', getCollection);
 
 router.get('/:id/compare', compareCollectionVersions);
 router.get('/:id/publish-status', checkPublishingStatus);
+
+router.post('/migrate/created-by', migrateCollectionsCreatedBy);
 
 // Protected routes (require authentication)
 router.post('/', createCollection);

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { Collection, ICollection } from '../models/Collection';
 import { Storyline, IStoryline } from '../models/Storyline';
-import { ErrorResponse } from '../types/response';
+import { ErrorResponse, AuthenticatedRequest } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 import mongoose from 'mongoose';
+
+import { User } from '../models/User';
 
 export async function getCollections(req: Request, res: Response) {
   try {
@@ -125,10 +127,20 @@ export async function getCollection(req: Request, res: Response) {
   }
 }
 
-export async function createCollection(req: Request, res: Response) {
+export async function createCollection(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
     const { name, description } = req.body;
     const status = 'preview'; // Always create as preview first
+    const userId = req.user?._id; // Get user ID from authenticated request
+
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        message: 'User authentication required',
+      } as ErrorResponse);
+    }
 
     if (!name) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -148,6 +160,7 @@ export async function createCollection(req: Request, res: Response) {
       name,
       description: description || '',
       status,
+      createdBy: userId,
     });
 
     const savedCollection = await newCollection.save();
@@ -227,10 +240,20 @@ export async function deleteCollection(req: Request, res: Response) {
   }
 }
 
-export async function duplicateCollection(req: Request, res: Response) {
+export async function duplicateCollection(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
     const { id } = req.params;
     const { includeStorylines = 'true' } = req.query;
+    const userId = req.user?._id; // Get user ID
+
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        message: 'User authentication required',
+      } as ErrorResponse);
+    }
 
     // Find the original collection to duplicate
     const originalCollection = await Collection.findOne({
@@ -254,6 +277,7 @@ export async function duplicateCollection(req: Request, res: Response) {
       name: duplicateName,
       description: originalCollection.description,
       status: 'preview',
+      createdBy: userId,
     });
 
     const savedDuplicateCollection = await duplicateCollection.save();
@@ -300,6 +324,179 @@ export async function duplicateCollection(req: Request, res: Response) {
     console.error('Error duplicating collection:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       message: 'Failed to duplicate collection',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    } as ErrorResponse);
+  }
+}
+
+// Add this migration function to your collections.ts file
+
+export async function migrateCollectionsCreatedBy(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        message: 'User authentication required',
+      } as ErrorResponse);
+    }
+
+    // Check if user is admin/superadmin (migration should be restricted)
+    if (
+      !req.user?.roles.includes('admin') &&
+      !req.user?.roles.includes('superadmin')
+    ) {
+      return res.status(HTTP_STATUS.FORBIDDEN).json({
+        message: 'Only admins can run migrations',
+      } as ErrorResponse);
+    }
+
+    // const { defaultUserId } = req.body;
+
+    const defaultUserId = userId;
+
+    if (!defaultUserId) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: 'defaultUserId is required in request body',
+        example: {
+          defaultUserId: '64f123456789abcdef123456',
+        },
+      } as ErrorResponse);
+    }
+
+    // Validate that the default user exists
+
+    const defaultUser = await User.findById(defaultUserId);
+
+    if (!defaultUser) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: 'Default user not found',
+      } as ErrorResponse);
+    }
+
+    let totalMigrated = 0;
+    const migrationResults = {
+      preview: { migrated: 0, errors: [] as any[] },
+      published: { migrated: 0, errors: [] as any[] },
+    };
+
+    // Migrate Preview Collections
+    try {
+      const previewCollections = await Collection.find({
+        status: 'preview',
+        $or: [
+          { createdBy: { $exists: false } }, // Collections without createdBy field
+          { createdBy: null }, // Collections with null createdBy
+        ],
+      });
+
+      console.log(
+        `Found ${previewCollections.length} preview collections to migrate`
+      );
+
+      for (const collection of previewCollections) {
+        try {
+          await Collection.findByIdAndUpdate(
+            collection._id,
+            { createdBy: defaultUserId },
+            { runValidators: true }
+          );
+
+          migrationResults.preview.migrated++;
+          totalMigrated++;
+
+          console.log(
+            `Migrated preview collection: ${collection._id} - ${collection.name}`
+          );
+        } catch (error) {
+          console.error(
+            `Error migrating preview collection ${collection._id}:`,
+            error
+          );
+          migrationResults.preview.errors.push({
+            id: collection._id,
+            name: collection.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching preview collections for migration:', error);
+    }
+
+    // Migrate Published Collections
+    try {
+      const publishedCollections = await Collection.find({
+        status: 'published',
+        $or: [{ createdBy: { $exists: false } }, { createdBy: null }],
+      });
+
+      console.log(
+        `Found ${publishedCollections.length} published collections to migrate`
+      );
+
+      for (const collection of publishedCollections) {
+        try {
+          await Collection.findByIdAndUpdate(
+            collection._id,
+            { createdBy: defaultUserId },
+            { runValidators: true }
+          );
+
+          migrationResults.published.migrated++;
+          totalMigrated++;
+
+          console.log(
+            `Migrated published collection: ${collection._id} - ${collection.name}`
+          );
+        } catch (error) {
+          console.error(
+            `Error migrating published collection ${collection._id}:`,
+            error
+          );
+          migrationResults.published.errors.push({
+            id: collection._id,
+            name: collection.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Error fetching published collections for migration:',
+        error
+      );
+    }
+
+    // Calculate total errors
+    const totalErrors =
+      migrationResults.preview.errors.length +
+      migrationResults.published.errors.length;
+
+    res.status(HTTP_STATUS.OK).json({
+      message: `Collection createdBy migration completed. Migrated ${totalMigrated} collections with ${totalErrors} errors.`,
+      data: {
+        totalMigrated,
+        totalErrors,
+        defaultUser: {
+          _id: defaultUser._id,
+          name: defaultUser.name || defaultUser.email,
+          email: defaultUser.email,
+        },
+        migrationResults,
+        summary: {
+          preview: `${migrationResults.preview.migrated} migrated, ${migrationResults.preview.errors.length} errors`,
+          published: `${migrationResults.published.migrated} migrated, ${migrationResults.published.errors.length} errors`,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error running collection createdBy migration:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+      message: 'Failed to run collection createdBy migration',
       error: error instanceof Error ? error.message : 'Unknown error',
     } as ErrorResponse);
   }
