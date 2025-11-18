@@ -560,13 +560,21 @@ export const uploadMultipleAudioAssets = async (
 export const getAssetsByType = async (req: Request, res: Response) => {
   try {
     const { type } = req.params;
-    const { page = 1, limit = 100, uploadedBy } = req.query;
+    const { page = 1, limit = 100, uploadedBy, search } = req.query;
 
     // Build query filter
     const filter: any = {};
 
     if (uploadedBy) {
       filter.uploadedBy = uploadedBy;
+    }
+
+    if (search && typeof search === 'string') {
+      const searchRegex = new RegExp(search, 'i'); // Case-insensitive search
+      filter.$or = [
+        { filename: { $regex: searchRegex } },
+        { originalName: { $regex: searchRegex } },
+      ];
     }
 
     const skip = (Number(page) - 1) * Number(limit);
