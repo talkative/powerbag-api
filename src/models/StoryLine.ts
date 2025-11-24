@@ -126,7 +126,7 @@ const StorylineSchema = new mongoose.Schema(
   }
 );
 
-StorylineSchema.post('findOneAndUpdate', async function (doc) {
+StorylineSchema.post('save', async function (doc) {
   try {
     console.log(`Post-save hook triggered for storyline: ${doc.title}`);
 

@@ -56,9 +56,14 @@ export async function getCollection(req: Request, res: Response) {
       status = 'preview',
       includeStorylines = 'false',
       includeLastUpdatedContent = 'false',
+      getByPreviewId = 'false',
     } = req.query;
 
-    const collection = await Collection.findOne({ _id: id, status });
+    const collection = await Collection.findOne(
+      getByPreviewId === 'true'
+        ? { previewVersionId: id, status }
+        : { _id: id, status }
+    );
 
     if (!collection) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -71,7 +76,7 @@ export async function getCollection(req: Request, res: Response) {
     // Optionally include storylines that belong to this collection
     if (includeStorylines === 'true') {
       const storylines = await Storyline.find({
-        collections: id,
+        collections: collection._id,
         status,
       })
         .sort({ updateDate: -1 }) // Sort by most recently updated
@@ -107,7 +112,7 @@ export async function getCollection(req: Request, res: Response) {
     } else if (includeLastUpdatedContent === 'true') {
       // If not including full storylines but want lastUpdatedContent, just get the latest updateDate
       const latestStoryline = await Storyline.findOne({
-        collections: id,
+        collections: collection._id,
         status,
       })
         .sort({ updateDate: -1 })
@@ -214,9 +219,11 @@ export async function deleteCollection(req: Request, res: Response) {
       query.status = status;
     }
 
-    const result = await Collection.deleteOne(query);
+    // const result = await Collection.deleteOne(query);
 
-    if (result.deletedCount === 0) {
+    const result = await Collection.findOneAndDelete(query);
+
+    if (!result) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
         message: 'Collection not found',
       } as ErrorResponse);

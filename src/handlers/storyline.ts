@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { IStoryline, Storyline } from '../models/Storyline';
 import { Collection } from '../models/Collection';
-import { ImageAsset, AudioAsset } from '../models/Asset';
+import { ImageAsset, VideoAsset, AudioAsset } from '../models/Asset';
 import {
   CreateStorylineDto,
   UpdateStorylineDto,
@@ -316,7 +316,7 @@ export async function createStoryline(req: Request, res: Response) {
 // Then create a helper function to resolve names when displaying
 export const resolveLocationNames = async (req: Request, res: Response) => {
   try {
-    const { locations } = req.body;
+    const { assetId, locations } = req.body;
 
     if (!locations || !Array.isArray(locations)) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -349,6 +349,37 @@ export const resolveLocationNames = async (req: Request, res: Response) => {
 
       const collection = await Collection.findById(collectionId);
       const storyline = await Storyline.findById(storylineId);
+
+      if (!collection || !storyline) {
+        let assetModel;
+
+        if (assetId) {
+          assetModel =
+            (await ImageAsset.findById(assetId)) ||
+            (await AudioAsset.findById(assetId)) ||
+            (await VideoAsset.findById(assetId));
+        }
+
+        if (assetModel) {
+          // Remove this invalid location from the asset
+          console.log(
+            `Removing invalid location "${location}" from asset ${assetModel._id}`
+          );
+          const updatedLocations = assetModel.location.filter(
+            (loc) => loc !== location
+          );
+          assetModel.location = updatedLocations;
+
+          await assetModel.save();
+          console.log(
+            `Updated asset ${assetModel._id} locations: ${updatedLocations.join(
+              ', '
+            )}`
+          );
+
+          continue; // Skip adding to results since it's invalid
+        }
+      }
 
       const result = {
         originalLocation: location,
@@ -406,12 +437,9 @@ export async function updateStoryline(req: Request, res: Response) {
       }
     }
 
-    // Update storyline
-    const updatedStoryline = await Storyline.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
+    Object.assign(existingStoryline, updateData);
+
+    const updatedStoryline = await existingStoryline.save();
 
     res.status(HTTP_STATUS.OK).json({
       message: 'Storyline updated successfully',
