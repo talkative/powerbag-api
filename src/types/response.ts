@@ -12,16 +12,12 @@ export interface User {
   name: string;
   email: string;
   roles: string[]; // Array of roles, e.g., ['member', 'admin']
+  assignedCollections: string[];
 }
 
 export interface AuthResponse {
   token: string;
-  user: {
-    _id: string;
-    name: string;
-    email: string;
-    roles: string[]; // Array of roles, e.g., ['member', 'admin']
-  };
+  user: User;
 }
 
 export interface LoginRequest {
@@ -30,10 +26,5 @@ export interface LoginRequest {
 }
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    _id: string;
-    email: string;
-    name: string;
-    roles: string[];
-  };
+  user?: User;
 }

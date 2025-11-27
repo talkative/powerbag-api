@@ -6,7 +6,7 @@ import {
   CreateStorylineDto,
   UpdateStorylineDto,
 } from '../dtos/CreateStoryline.dto';
-import { ErrorResponse } from '../types/response';
+import { ErrorResponse, AuthenticatedRequest } from '../types/response';
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
 export async function getStorylines(req: Request, res: Response) {
@@ -314,7 +314,14 @@ export async function createStoryline(req: Request, res: Response) {
 }
 
 // Then create a helper function to resolve names when displaying
-export const resolveLocationNames = async (req: Request, res: Response) => {
+export const resolveLocationNames = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const user = req.user;
+  const isAdmin = user?.roles.includes('admin');
+  const isMember = user?.roles.includes('member');
+
   try {
     const { assetId, locations } = req.body;
 
@@ -345,6 +352,13 @@ export const resolveLocationNames = async (req: Request, res: Response) => {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
           message: `Invalid location format: "${location}". Expected format: collectionId:storylineId`,
         } as ErrorResponse);
+      }
+
+      const isAssignedCollection =
+        user?.assignedCollections.includes(collectionId);
+
+      if (!isAssignedCollection && (isAdmin || isMember)) {
+        continue; // Skip locations not in user's assigned collections
       }
 
       const collection = await Collection.findById(collectionId);

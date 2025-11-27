@@ -557,13 +557,40 @@ export const uploadMultipleAudioAssets = async (
 };
 
 // Get assets by type
-export const getAssetsByType = async (req: Request, res: Response) => {
+export const getAssetsByType = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const user = req.user;
+
+  const isMember = user?.roles.includes('member');
+  const isAdmin = user?.roles.includes('admin');
+
+  const hasAssignedCollections =
+    user?.assignedCollections && user.assignedCollections.length > 0;
+
   try {
     const { type } = req.params;
     const { page = 1, limit = 100, uploadedBy, search } = req.query;
 
     // Build query filter
     const filter: any = {};
+
+    // Filter by collection access for members and admins
+    if ((isMember || isAdmin) && hasAssignedCollections) {
+      const locationPatterns = user.assignedCollections.map(
+        (collectionId) => new RegExp(`^${collectionId}:`)
+      );
+
+      filter.location = {
+        $in: locationPatterns,
+      };
+    }
+
+    // If user has no assigned collections and is a member/admin, they should see no assets
+    if ((isMember || isAdmin) && !hasAssignedCollections) {
+      filter._id = { $exists: false }; // This will return no results
+    }
 
     if (uploadedBy) {
       filter.uploadedBy = uploadedBy;

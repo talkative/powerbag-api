@@ -2,10 +2,10 @@ import type { Request, Response } from 'express-serve-static-core';
 import { CreateUserDto } from '../dtos/CreateUser.dto';
 import { CreateUserQueryParams } from '../types/query-params';
 import {
-  User as UserResponse,
   ErrorResponse,
   AuthResponse,
   LoginRequest,
+  AuthenticatedRequest,
 } from '../types/response';
 import { User, IUser } from '../models/User';
 import { generateToken } from '../utils/jwt';
@@ -13,10 +13,26 @@ import { sendEmail } from '../utils/mandrill';
 
 import { HTTP_STATUS } from '../constants/httpStatusCodes';
 
-export async function getUsers(req: Request, res: Response) {
-  try {
-    const users = await User.find().populate('assignedCollections');
+export async function getUsers(req: AuthenticatedRequest, res: Response) {
+  const user = req.user;
+  const isMember = user?.roles.includes('member');
+  const isAdmin = user?.roles.includes('admin');
 
+  if (isMember) {
+    return res.status(HTTP_STATUS.FORBIDDEN).json({ message: 'Access denied' });
+  }
+
+  const filter: any = {};
+
+  if (isAdmin) {
+    filter.$or = [
+      { assignedCollections: { $in: user?.assignedCollections } },
+      { roles: { $in: 'superadmin' } },
+    ];
+  }
+
+  try {
+    const users = await User.find(filter).populate('assignedCollections');
     res.send(users);
   } catch (error) {
     res
@@ -179,6 +195,9 @@ export async function loginUser(
         name: user.name,
         email: user.email,
         roles: user.roles, // Include roles in the response
+        assignedCollections: user.assignedCollections.map((id) =>
+          id.toString()
+        ),
       },
     });
   } catch (error) {
